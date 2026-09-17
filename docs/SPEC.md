@@ -11,6 +11,8 @@
 
 ## 0. Changes from v2.2
 
+**v2.3.1** restores a contract regression: memory scope isolation was invariant 13 and test T10 in the v1 plan, and was dropped silently somewhere between v1 and v2.2 — absent from the invariant list, the required tests and the release gate alike. It is back as invariant 33 / `SEC-017`. Worth noting how it was lost: each revision was reviewed for what it added, not for what it no longer said.
+
 1. **Counterexample execution is now a governed execution path** (§8.3–8.4, invariant 31, `SEC-009..012`). v2.2 made the harness execute model-authored counterexamples but placed no sandbox, resource, mutation, network, or taint constraints on that path.
 2. **`DIVERGENT` has defined runtime semantics** (§11.1, invariant 32). v2.2 defined it as a final state but not what happens to an in-flight agentic run.
 3. **Task-type conservative fallback is specified as `open`** (§5).
@@ -75,6 +77,7 @@ The core differentiation is:
 30. `DIVERGENT` is a legitimate final state for open tasks.
 31. **Model-authored code — including counterexamples — is never executed outside a healthy sandbox, and never against the live workspace.** If sandbox health is insufficient, execution does not occur and the objection cannot reach `VALIDATED` by execution.
 32. **A `DIVERGENT` or `ABSTAIN` result never silently continues an agentic run.** Interactive runs pause for user arbitration; non-interactive runs terminate without further workspace mutation or remote spend.
+33. **Memory scopes do not leak.** A workspace only ever retrieves its own workspace memory; session and agent memory stay within their session and agent; global memory is shared by design and is written conservatively. One project's notes never surface while working on another.
 
 Every invariant maps to at least one automated test ID; see §32 and `docs/INVARIANT_TEST_MATRIX.md`.
 
@@ -1048,7 +1051,8 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `SEC-013` workspace/local/environment config cannot weaken a global hard safety rule;
 - `SEC-014` audit records contain no reasoning-channel/scratchpad content;
 - `SEC-015` secret values are redacted from tool output, audit records, model context, and UI responses;
-- `SEC-016` instruction-shaped text inside file/web content does not become system or user instruction.
+- `SEC-016` instruction-shaped text inside file/web content does not become system or user instruction;
+- `SEC-017` memory written in one workspace is not retrievable from another.
 
 **Decision**
 
