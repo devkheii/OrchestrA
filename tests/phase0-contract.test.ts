@@ -37,7 +37,6 @@ const STUBS: Stub[] = [
   { name: "stripReasoningChannel", call: () => engine.stripReasoningChannel({}) },
   { name: "openAuditLog", call: () => engine.openAuditLog("/tmp") },
   { name: "replayDryRun", call: () => engine.replayDryRun("dec_x") },
-  { name: "openSessionStore", call: () => engine.openSessionStore("/tmp/a.db") },
   { name: "cancelRun", call: () => engine.cancelRun({ pids: [], ptyIds: [], abort: new AbortController() }, 1) },
   { name: "writeCheckpoint", call: () => engine.writeCheckpoint("ses_x", 0) },
   { name: "buildWorkingContext", call: () => engine.buildWorkingContext({
@@ -50,16 +49,21 @@ const STUBS: Stub[] = [
 ];
 
 /**
- * Implemented, so no longer stubs. This list shrinks as phases land; an entry
- * moves out of STUBS only when its own suite is green.
+ * Implemented, so no longer stubs. STUBS shrinks and this grows as phases
+ * land; an entry moves across only when its own suite is green.
  *
- *   Phase 1 step 2 — startDaemon, isAllowedHost, isAllowedOrigin, tokenFilePath
+ *   Phase 1 step 2 — authenticated daemon      (SEC-001, SEC-002)
+ *   Phase 1 step 3 — session/event persistence (RUN-004)
+ *
+ * The probe below calls each with valid but inert arguments: it checks the
+ * wiring, not the behaviour. Behaviour belongs to the named suites.
  */
-const IMPLEMENTED: readonly string[] = [
-  "startDaemon",
-  "isAllowedHost",
-  "isAllowedOrigin",
-  "tokenFilePath",
+const IMPLEMENTED: Stub[] = [
+  { name: "isAllowedHost", call: () => daemon.isAllowedHost("127.0.0.1:1", 1) },
+  { name: "isAllowedOrigin", call: () => daemon.isAllowedOrigin("http://a", "http://a") },
+  { name: "tokenFilePath", call: () => daemon.tokenFilePath("/tmp") },
+  { name: "startDaemon", call: () => typeof daemon.startDaemon },
+  { name: "openSessionStore", call: () => engine.openSessionStore(":memory:") },
 ];
 
 /** Test IDs declared in docs/SPEC.md section 31. */
@@ -86,19 +90,15 @@ describe("Phase 0: the contract is wired before any module is written", () => {
 });
 
 describe("Phase 1: implemented modules have left the stub list", () => {
-  it.each(IMPLEMENTED)("%s is exported and no longer throws NotImplemented", (name) => {
-    const fn = (daemon as Record<string, unknown>)[name];
-    expect(typeof fn, `${name} is not exported`).toBe("function");
-    // Called with arguments that are valid but inert, so this checks wiring
-    // rather than behaviour; behaviour belongs to the SEC-00x suites.
-    const probe: Record<string, () => unknown> = {
-      isAllowedHost: () => daemon.isAllowedHost("127.0.0.1:1", 1),
-      isAllowedOrigin: () => daemon.isAllowedOrigin("http://a", "http://a"),
-      tokenFilePath: () => daemon.tokenFilePath("/tmp"),
-      startDaemon: () => undefined, // starting a server is the suite's job, not this one
-    };
-    expect(probe[name]).toBeDefined();
-    expect(() => probe[name]?.()).not.toThrow(NotImplemented);
+  it.each(IMPLEMENTED)("$name no longer throws NotImplemented", ({ call }) => {
+    expect(call).not.toThrow(NotImplemented);
+  });
+
+  it("never lists the same symbol as both stubbed and implemented", () => {
+    const stubbed = new Set(STUBS.map((s) => s.name));
+    for (const { name } of IMPLEMENTED) {
+      expect(stubbed, `${name} is in both lists`).not.toContain(name);
+    }
   });
 });
 

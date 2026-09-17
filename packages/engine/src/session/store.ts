@@ -22,11 +22,11 @@ export interface SessionStore {
   /** Daemon assigns `seq`; callers never supply it. */
   append(id: SessionId, event: SessionEventInput): Promise<SessionEvent>;
   events(id: SessionId, sinceSeq?: number): Promise<SessionEvent[]>;
+  /** Releases the database handle. Safe to call more than once. */
+  close(): Promise<void>;
 }
 
-export function openSessionStore(_dbPath: string): Promise<SessionStore> {
-  throw new NotImplemented("openSessionStore", "RUN-004");
-}
+export { openSessionStore } from "./sqlite-store.js";
 
 /**
  * Cancellation cascade (SPEC section 23). Graceful stop, bounded grace

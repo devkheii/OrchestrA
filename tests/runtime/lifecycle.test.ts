@@ -26,37 +26,90 @@ describe("RUN-004: daemon restart preserves session and audit", () => {
         role: "user",
         contentHash: "h1",
       });
-
       // Simulates the daemon going away.
-      const second = await openSessionStore(dbPath);
-      const restored = await second.get(session.id);
-      expect(restored?.id).toBe(session.id);
+      await first.close();
 
-      const events = await second.events(session.id);
-      expect(events.map((e) => e.type)).toContain("message.received");
+      const second = await openSessionStore(dbPath);
+      try {
+        const restored = await second.get(session.id);
+        expect(restored?.id).toBe(session.id);
+        expect(restored?.workspace).toBe(dir);
+
+        const events = await second.events(session.id);
+        expect(events.map((e) => e.type)).toContain("message.received");
+        // Event payloads survive the round trip, not just their type.
+        expect(events[0]).toMatchObject({ seq: 1, contentHash: "h1" });
+      } finally {
+        await second.close();
+      }
     });
   });
 
   it("assigns monotonic sequence numbers the client never supplies", async () => {
     await withTempDir(async (dir) => {
       const store = await openSessionStore(join(dir, "app.db"));
-      const session = await store.create(dir);
-      const at = new Date().toISOString();
+      try {
+        const session = await store.create(dir);
+        const at = new Date().toISOString();
 
-      const a = await store.append(session.id, {
-        type: "answer.delta",
-        sessionId: session.id,
-        at,
-        text: "one",
-      });
-      const b = await store.append(session.id, {
-        type: "answer.delta",
-        sessionId: session.id,
-        at,
-        text: "two",
-      });
+        const a = await store.append(session.id, {
+          type: "answer.delta",
+          sessionId: session.id,
+          at,
+          text: "one",
+        });
+        const b = await store.append(session.id, {
+          type: "answer.delta",
+          sessionId: session.id,
+          at,
+          text: "two",
+        });
 
-      expect(b.seq).toBeGreaterThan(a.seq);
+        expect(a.seq).toBe(1);
+        expect(b.seq).toBe(2);
+      } finally {
+        await store.close();
+      }
+    });
+  });
+
+  it("refuses to append to a session that does not exist", async () => {
+    await withTempDir(async (dir) => {
+      const store = await openSessionStore(join(dir, "app.db"));
+      try {
+        await expect(
+          store.append("ses_nonexistent", {
+            type: "answer.delta",
+            sessionId: "ses_nonexistent",
+            at: new Date().toISOString(),
+            text: "orphan",
+          }),
+        ).rejects.toThrow(/unknown session/);
+      } finally {
+        await store.close();
+      }
+    });
+  });
+
+  it("returns only events after the requested sequence, so a client can resume", async () => {
+    await withTempDir(async (dir) => {
+      const store = await openSessionStore(join(dir, "app.db"));
+      try {
+        const session = await store.create(dir);
+        const at = new Date().toISOString();
+        for (const text of ["a", "b", "c"]) {
+          await store.append(session.id, {
+            type: "answer.delta",
+            sessionId: session.id,
+            at,
+            text,
+          });
+        }
+        const tail = await store.events(session.id, 1);
+        expect(tail.map((e) => e.seq)).toEqual([2, 3]);
+      } finally {
+        await store.close();
+      }
     });
   });
 });
@@ -105,24 +158,28 @@ describe("RUN-005: compaction leaves the canonical transcript intact", () => {
   it("keeps every original event after a checkpoint is written", async () => {
     await withTempDir(async (dir) => {
       const store = await openSessionStore(join(dir, "app.db"));
-      const session = await store.create(dir);
-      const at = new Date().toISOString();
+      try {
+        const session = await store.create(dir);
+        const at = new Date().toISOString();
 
-      for (let i = 0; i < 20; i++) {
-        await store.append(session.id, {
-          type: "answer.delta",
-          sessionId: session.id,
-          at,
-          text: `chunk ${i}`,
-        });
+        for (let i = 0; i < 20; i++) {
+          await store.append(session.id, {
+            type: "answer.delta",
+            sessionId: session.id,
+            at,
+            text: `chunk ${i}`,
+          });
+        }
+        const before = await store.events(session.id);
+
+        await writeCheckpoint(session.id, before.length);
+
+        const after = await store.events(session.id);
+        expect(after.length).toBe(before.length);
+        expect(after).toEqual(before);
+      } finally {
+        await store.close();
       }
-      const before = await store.events(session.id);
-
-      await writeCheckpoint(session.id, before.length);
-
-      const after = await store.events(session.id);
-      expect(after.length).toBe(before.length);
-      expect(after).toEqual(before);
     });
   });
 });
