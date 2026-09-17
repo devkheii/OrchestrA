@@ -11,3 +11,7 @@ coverage/
 # Superseded drafts. The current SPEC and plan are published; these are not,
 # so nobody implements against a revision whose defects were already fixed.
 docs/archive/
+
+# The upstream dataset is fetched, not authored: experiments/ceiling/data/tasks.jsonl
+# is the selection this experiment actually ran on and that one is committed.
+experiments/ceiling/data/HumanEvalPlus*
