@@ -1,6 +1,6 @@
 # Democracy Harness
 
-A local-first, auditable AI agent harness.
+A local-first, auditable AI agent harness. The repository is `OrchestrA`; the harness is Democracy Harness and its command is `dem`.
 
 > Closed/verifiable tasks: seek verified consensus.
 > Open tasks: surface meaningful divergence.
