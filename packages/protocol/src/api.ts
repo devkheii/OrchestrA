@@ -64,6 +64,8 @@ export interface DaemonOptions {
    * present.
    */
   provider?: Provider;
+  /** Tool rounds before the loop gives up. Guards against a model that loops. */
+  maxRounds?: number;
 }
 
 export interface DaemonHandle {

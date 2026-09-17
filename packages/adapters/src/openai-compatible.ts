@@ -1,6 +1,7 @@
 import { CAP_TEXT_GENERATE, CAP_TEXT_REASON, CAP_TOOL_CALL } from "@dem/protocol";
 import type {
   ModelEvent,
+  ModelMessage,
   ModelRequest,
   Provider,
   ProviderHealth,
@@ -95,8 +96,20 @@ export class OpenAICompatibleProvider implements Provider {
         headers: { "content-type": "application/json", ...this.headers() },
         body: JSON.stringify({
           model: this.config.model,
-          messages: request.messages,
+          messages: request.messages.map(toWireMessage),
           stream: true,
+          ...(request.tools?.length
+            ? {
+                tools: request.tools.map((tool) => ({
+                  type: "function",
+                  function: {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: tool.parameters,
+                  },
+                })),
+              }
+            : {}),
           ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
           ...(request.maxOutputTokens !== undefined ? { max_tokens: request.maxOutputTokens } : {}),
         }),
@@ -119,6 +132,10 @@ export class OpenAICompatibleProvider implements Provider {
     }
 
     let reason: "stop" | "length" | "cancelled" = "stop";
+    // Tool arguments arrive as partial JSON across frames, so a call is only
+    // whole once the stream ends. Emitting early would hand the loop a
+    // half-parsed object it would have to guess at.
+    const pending = new Map<number, { id: string; name: string; args: string }>();
 
     try {
       for await (const payload of sseFrames(response.body, signal)) {
@@ -144,6 +161,14 @@ export class OpenAICompatibleProvider implements Provider {
         const text = contentOf(choice.delta);
         if (text) yield { type: "delta", text };
 
+        for (const part of choice.delta?.["tool_calls"] as WireToolCall[] | undefined ?? []) {
+          const slot = pending.get(part.index) ?? { id: "", name: "", args: "" };
+          if (part.id) slot.id = part.id;
+          if (part.function?.name) slot.name = part.function.name;
+          if (part.function?.arguments) slot.args += part.function.arguments;
+          pending.set(part.index, slot);
+        }
+
         if (choice.finish_reason === "length") reason = "length";
       }
     } catch (err) {
@@ -155,6 +180,26 @@ export class OpenAICompatibleProvider implements Provider {
       return;
     }
 
+    for (const [index, slot] of pending) {
+      if (!slot.name) continue;
+      let args: Record<string, unknown>;
+      try {
+        args = slot.args ? (JSON.parse(slot.args) as Record<string, unknown>) : {};
+      } catch {
+        // Malformed arguments are reported rather than guessed at. A tool call
+        // run on a repaired guess is a side effect nobody asked for.
+        yield {
+          type: "error",
+          message: `tool call ${slot.name} had unparseable arguments: ${slot.args.slice(0, 200)}`,
+        };
+        continue;
+      }
+      yield {
+        type: "tool_call",
+        call: { id: slot.id || `call_${index}`, name: slot.name, arguments: args },
+      };
+    }
+
     yield { type: "done", reason: signal?.aborted ? "cancelled" : reason };
   }
 
@@ -164,6 +209,19 @@ export class OpenAICompatibleProvider implements Provider {
       ...this.config.headers,
     };
   }
+}
+
+interface WireToolCall {
+  index: number;
+  id?: string;
+  function?: { name?: string; arguments?: string };
+}
+
+/** A tool result carries the id of the call it answers. */
+function toWireMessage(message: ModelMessage): Record<string, unknown> {
+  return message.role === "tool"
+    ? { role: "tool", content: message.content, tool_call_id: message.toolCallId }
+    : { role: message.role, content: message.content };
 }
 
 interface ChatFrame {

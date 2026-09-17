@@ -3,6 +3,7 @@
  * never learns a model name (SPEC section 29).
  */
 export { FakeProvider } from "./fake-provider.js";
+export type { FakeTurn } from "./fake-provider.js";
 export { OpenAICompatibleProvider } from "./openai-compatible.js";
 export type { OpenAICompatibleConfig } from "./openai-compatible.js";
 export { ClaudeCliProvider } from "./claude-cli.js";

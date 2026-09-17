@@ -85,6 +85,7 @@ The core differentiation is:
 38. **An online benchmark score is never presented as a local measurement.** A published figure describes some other machine's build of a model; it is labelled as a prior and never shown as, or recorded as, something measured on this hardware with this quantization.
 39. **Hard constraints are not scoreable.** Privacy, capability, context capacity, resource fit and budget are filters applied before scoring. No score, weight or preference can readmit a candidate that failed one.
 40. **Scheduling estimates are evidence, not claims.** An ETA or score is recorded alongside the actual outcome, so a prediction can be checked against what happened rather than standing on its own.
+41. **Simulated tool use is never presented as a completed action.** A model that writes tool-call syntax instead of calling a tool has not acted, and any result it goes on to report was invented. The run ends in error naming what happened, rather than the narration being scrubbed and the conclusion drawn from it left standing. A provider that cannot call tools is told so and is offered none.
 
 Every invariant maps to at least one automated test ID; see §32 and `docs/INVARIANT_TEST_MATRIX.md`.
 
@@ -1110,7 +1111,8 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `SEC-019` a raw reasoning channel is never stored or concatenated into the answer, while a summarized rationale is kept as a separate labelled event;
 - `SEC-020` a tool call cannot reach execution without a Permission Broker decision, and the decision is recorded;
 - `SEC-021` a child agent or task cannot hold a wider permission, privacy, egress or budget policy than its parent;
-- `ORCH-007` an online benchmark score is labelled as a prior and never reported as a local measurement.
+- `ORCH-007` an online benchmark score is labelled as a prior and never reported as a local measurement;
+- `SEC-022` a model narrating a tool call it did not make fails the run instead of having its fabricated result reported as an answer.
 
 **Decision**
 

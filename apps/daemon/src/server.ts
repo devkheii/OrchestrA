@@ -21,7 +21,9 @@ import {
   tokenMatches,
   writeTokenFile,
 } from "./auth.js";
-import { createSession, readEvents, runMessage } from "./sessions.js";
+import { approvePending, createSession, readEvents, runMessage } from "./sessions.js";
+import { createToolRegistry, selectableModes, type ToolRegistry } from "@dem/engine";
+import type { LoopDeps } from "./agent-loop.js";
 
 /**
  * The local daemon (SPEC section 21; tests SEC-001, SEC-002).
@@ -95,6 +97,22 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonHandle>
     );
   }
 
+  const registry: ToolRegistry = createToolRegistry({ workspace: options.workspace });
+
+  // v0.1 ships no sandbox adapter, so ASK is both the default and the ceiling
+  // (SPEC 19.1). Asking selectableModes rather than hardcoding it means the
+  // ceiling lifts on its own when an adapter lands.
+  const modes = selectableModes("UNAVAILABLE");
+  const mode = modes.includes("AUTO") ? "AUTO" : "ASK";
+
+  const loopDeps = (signal: AbortSignal): Omit<LoopDeps, "store"> => ({
+    provider,
+    registry,
+    policy: { mode, taint: "CLEAN", sandbox: "UNAVAILABLE" },
+    maxRounds: options.maxRounds ?? 12,
+    signal,
+  });
+
   const server = createServer();
   const inFlight = new Map<SessionId, AbortController>();
   let selfOrigin = "";
@@ -153,8 +171,13 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonHandle>
         return;
 
       case "/tools":
-        // No tool broker yet; an empty list is the honest answer.
-        send(res, 200, { tools: [] });
+        send(res, 200, {
+          tools: registry.list().map((t) => ({
+            name: t.name,
+            description: t.description,
+            action: t.action,
+          })),
+        });
         return;
 
       case "/sessions": {
@@ -182,11 +205,38 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonHandle>
         const abort = new AbortController();
         inFlight.set(id, abort);
         try {
-          await runMessage(store, provider, id, content, abort.signal);
+          const outcome = await runMessage(store, loopDeps(abort.signal), id, content);
+          send(res, outcome.status === "awaiting_approval" ? 200 : 202, outcome);
         } finally {
           inFlight.delete(id);
         }
-        send(res, 202, { accepted: true });
+        return;
+      }
+
+      case "/sessions/:id/approve": {
+        const id = sessionIdFrom(url.pathname);
+        if (!id || !(await store.get(id))) {
+          send(res, 404, { error: "not_found" });
+          return;
+        }
+        const body = await readJson(req);
+        const callId = typeof body["callId"] === "string" ? body["callId"] : "";
+        if (!callId) {
+          // The approval names the call it answers. Without it the daemon
+          // would have to assume which pending call was meant, and assuming
+          // wrong means running something the user did not look at.
+          send(res, 400, { error: "callId required" });
+          return;
+        }
+
+        const abort = new AbortController();
+        inFlight.set(id, abort);
+        try {
+          const outcome = await approvePending(store, loopDeps(abort.signal), id, callId);
+          send(res, 200, outcome);
+        } finally {
+          inFlight.delete(id);
+        }
         return;
       }
 

@@ -81,6 +81,72 @@ export async function main(argv: readonly string[], io: Io = consoleIo): Promise
   }
 }
 
+interface RunOutcome {
+  status: string;
+  detail?: string;
+  pending?: { call: { id: string; name: string; arguments: Record<string, unknown> }; rule: string };
+}
+
+/** Print tool activity the user has not seen yet. Returns the new watermark. */
+async function renderProgress(
+  daemon: DaemonHandle,
+  id: string,
+  io: Io,
+  from: number,
+): Promise<number> {
+  const res = await fetch(`${daemon.url}/sessions/${id}/events?since=${from}`, {
+    headers: { authorization: `Bearer ${daemon.token}` },
+  });
+  const { events } = (await res.json()) as { events: SessionEvent[] };
+
+  for (const event of events) {
+    if (event.type === "tool.finished") {
+      io.err(`[2m● ${event.tool}${event.ok ? "" : " (failed)"}[0m\n`);
+    }
+  }
+  return events.at(-1)?.seq ?? from;
+}
+
+/**
+ * Ask the user about one pending call.
+ *
+ * The exact command is printed, not a summary of it. A prompt that says
+ * "run a shell command?" trains the user to say yes without reading, which
+ * turns every later approval into a formality.
+ */
+async function askApproval(
+  pending: NonNullable<RunOutcome["pending"]>,
+  io: Io,
+): Promise<boolean> {
+  const { call, rule } = pending;
+  const detail =
+    typeof call.arguments["command"] === "string"
+      ? call.arguments["command"]
+      : JSON.stringify(call.arguments);
+
+  io.err(`\n[1m${call.name}[0m  ${detail}\n`);
+  io.err(`[2m${rule}[0m\n`);
+  io.err("allow? [y/N] ");
+
+  if (!process.stdin.isTTY) {
+    // Non-interactive: refuse rather than assume. A pipe cannot consent, and
+    // defaulting to yes would make every scripted run auto-approving.
+    io.err("\nno tty; declining\n");
+    return false;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    process.stdin.setEncoding("utf8");
+    process.stdin.resume();
+    process.stdin.once("data", (chunk: string) => {
+      process.stdin.pause();
+      const answer = chunk.trim().toLowerCase();
+      io.err("\n");
+      resolve(answer === "y" || answer === "yes");
+    });
+  });
+}
+
 async function withDaemon(io: Io, fn: (d: DaemonHandle) => Promise<number>): Promise<number> {
   const stateDir = defaultStateDir();
   const daemon = await startDaemon({ workspace: process.cwd(), stateDir });
@@ -107,11 +173,39 @@ async function runOnce(daemon: DaemonHandle, prompt: string, io: Io): Promise<nu
   });
   const { id } = (await created.json()) as { id: string };
 
-  await fetch(`${daemon.url}/sessions/${id}/messages`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ content: prompt }),
-  });
+  let outcome = (await (
+    await fetch(`${daemon.url}/sessions/${id}/messages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ content: prompt }),
+    })
+  ).json()) as RunOutcome;
+
+  let shown = 0;
+
+  // The run stops at each approval rather than queueing them, so the user is
+  // answering one concrete command at a time instead of a batch they would
+  // skim. Work already done is printed before the question, so the decision is
+  // made with the transcript in view.
+  while (outcome.status === "awaiting_approval" && outcome.pending) {
+    shown = await renderProgress(daemon, id, io, shown);
+
+    const approved = await askApproval(outcome.pending, io);
+    if (!approved) {
+      io.err("\ndeclined; stopping here\n");
+      return 1;
+    }
+
+    outcome = (await (
+      await fetch(`${daemon.url}/sessions/${id}/approve`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ callId: outcome.pending.call.id }),
+      })
+    ).json()) as RunOutcome;
+  }
+
+  if (outcome.status === "budget") io.err(`\n${outcome.detail}\n`);
 
   const events = await fetch(`${daemon.url}/sessions/${id}/events`, {
     headers: { authorization: `Bearer ${daemon.token}` },
@@ -133,6 +227,13 @@ async function runOnce(daemon: DaemonHandle, prompt: string, io: Io): Promise<nu
     }
     io.err("[2m└[0m\n\n");
   }
+
+  for (const event of log) {
+    if (event.type === "tool.finished") {
+      io.err(`[2m● ${event.tool}${event.ok ? "" : " (failed)"}[0m\n`);
+    }
+  }
+  if (log.some((e) => e.type === "tool.finished")) io.err("\n");
 
   for (const event of log) {
     if (event.type === "answer.delta") io.out(event.text);

@@ -39,6 +39,7 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 34 | External-agent delegation is bounded and recorded as suspended guarantees | `SEC-018` | adapters, session | deferred (v0.3) — ExternalAgentAdapter is not built yet |
 | 35 | Reasoning is a public rationale or it is not kept | `SEC-019` | adapters, audit | green |
 | 36 | Tool execution cannot bypass the Permission Broker | `SEC-020` | permissions, tools | green — restored from v2.1 #7 |
+| 41 | Simulated tool use is never presented as a completed action | `SEC-022` | session, adapters | green — found by dogfooding, not by review |
 | 37 | A child agent or task inherits the parent policy or stricter | `SEC-021` | policy, adapters | deferred (v0.3) — restored from v2.1 #27; no child tasks exist yet |
 | 38 | An online benchmark score is never presented as a local measurement | `ORCH-007` | benchmark | deferred (v0.3) — restored from v2.1 #20 |
 | 39 | Hard constraints are not scoreable | `ORCH-005` | orchestrator | deferred (v0.3) — restored from v2.1 #23; the test survived, the invariant did not |
@@ -101,13 +102,13 @@ Additional orchestrator tests required by SPEC §31: `ORCH-001` (OBSERVE does no
 
 | Release | Invariants that must be `green` |
 |---|---|
-| v0.1 | 1, 2, 4, 5, 6, 7, 8, 9, 16, 17, 20, 21, 26, 27, 28, 29, 33, 35, 36 |
+| v0.1 | 1, 2, 4, 5, 6, 7, 8, 9, 16, 17, 20, 21, 26, 27, 28, 29, 33, 35, 36, 41 |
 | v0.2-alpha | + 3, 10, 11, 12, 13, 14, 15, 31 |
 | v0.2-beta | + 18, 22, 23, 30, 32 |
 | v0.3 | + 24, 34, 37, 38, 39, 40 |
 | v0.3.1 | + 19 |
 | v0.4 | + 25 |
-| 1.0 | all 40, plus the efficacy gate of SPEC §28 |
+| 1.0 | all 41, plus the efficacy gate of SPEC §28 |
 
 ---
 

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import type { Provider, SessionEvent, SessionId } from "@dem/protocol";
+import type { SessionEvent, SessionId } from "@dem/protocol";
 import type { SessionStore } from "@dem/engine";
+import { advanceRun, type LoopDeps, type RunOutcome } from "./agent-loop.js";
 
 /**
  * Session lifecycle over the API (plan 4.2, acceptance in tests/acceptance).
@@ -37,81 +38,54 @@ export async function createSession(store: SessionStore, workspace: string) {
  * the end. A crash mid-generation then leaves a partial, honest transcript
  * instead of nothing at all.
  */
+/**
+ * Record the user's message, then hand control to the agent loop.
+ *
+ * The message text is stored alongside its hash because the loop rebuilds the
+ * conversation from this log. A record that cannot reconstruct the prompt is a
+ * record of a session having happened, not of what happened in it.
+ */
 export async function runMessage(
   store: SessionStore,
-  provider: Provider,
+  deps: Omit<LoopDeps, "store">,
   id: SessionId,
   content: string,
-  signal: AbortSignal,
-): Promise<RunResult> {
-  const now = () => new Date().toISOString();
-
+): Promise<RunOutcome> {
   await store.append(id, {
     type: "message.received",
     sessionId: id,
-    at: now(),
+    at: new Date().toISOString(),
     role: "user",
     contentHash: hash(content),
+    content,
   });
 
+  return advanceRun({ ...deps, store }, id);
+}
+
+/**
+ * Record the user's answer to a pending approval and continue.
+ *
+ * Granting is a separate event from the decision that asked for it, so the log
+ * shows both what the broker said and what the user then chose. A single
+ * mutated record would lose the distinction between "allowed" and "allowed
+ * because someone said so".
+ */
+export async function approvePending(
+  store: SessionStore,
+  deps: Omit<LoopDeps, "store">,
+  id: SessionId,
+  callId: string,
+): Promise<RunOutcome> {
   await store.append(id, {
-    type: "model.started",
+    type: "permission.granted",
     sessionId: id,
-    at: now(),
-    provider: provider.id,
-    model: provider.id,
+    at: new Date().toISOString(),
+    by: "user",
+    callId,
   });
 
-  let reason: RunResult["reason"] = "stop";
-  try {
-    for await (const event of provider.run(
-      { messages: [{ role: "user", content }] },
-      { signal },
-    )) {
-      if (event.type === "rationale") {
-        // Persisted like any other event, so what the user is shown and what the
-        // record contains cannot drift apart (SPEC 15.1).
-        await store.append(id, {
-          type: "answer.rationale",
-          sessionId: id,
-          at: now(),
-          text: event.text,
-        });
-      } else if (event.type === "delta") {
-        await store.append(id, {
-          type: "answer.delta",
-          sessionId: id,
-          at: now(),
-          text: event.text,
-        });
-      } else if (event.type === "done") {
-        reason = event.reason;
-      } else {
-        reason = "error";
-        break;
-      }
-    }
-  } catch {
-    reason = "error";
-  }
-
-  if (reason === "cancelled") {
-    await store.append(id, {
-      type: "session.cancelled",
-      sessionId: id,
-      at: now(),
-      reason: "client cancelled",
-    });
-    return { completed: false, reason };
-  }
-
-  await store.append(id, {
-    type: "session.completed",
-    sessionId: id,
-    at: now(),
-    status: reason === "error" ? "error" : "ok",
-  });
-  return { completed: true, reason };
+  return advanceRun({ ...deps, store }, id);
 }
 
 export async function readEvents(
