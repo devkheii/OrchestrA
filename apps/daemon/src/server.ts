@@ -1,21 +1,40 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { HEALTHZ_BODY, ROUTES, type DaemonHandle, type DaemonOptions, type RouteSpec } from "@dem/protocol";
-import { bearerFrom, isAllowedHost, isAllowedOrigin, mintToken, tokenMatches, writeTokenFile } from "./auth.js";
+import {
+  HEALTHZ_BODY,
+  ROUTES,
+  isId,
+  type DaemonHandle,
+  type DaemonOptions,
+  type Provider,
+  type RouteSpec,
+  type SessionId,
+} from "@dem/protocol";
+import { openSessionStore, type SessionStore } from "@dem/engine";
+import { FakeProvider } from "@dem/adapters";
+import {
+  bearerFrom,
+  isAllowedHost,
+  isAllowedOrigin,
+  mintToken,
+  tokenMatches,
+  writeTokenFile,
+} from "./auth.js";
+import { createSession, readEvents, runMessage } from "./sessions.js";
 
 /**
  * The local daemon (SPEC section 21; tests SEC-001, SEC-002).
  *
- * Request order matters and is deliberate:
+ * Request order is deliberate:
  *
- *   1. Host      — reject a rebound hostname before anything else runs
- *   2. Origin    — reject a foreign browser origin before touching the token,
- *                  so a hostile page learns nothing about token validity
- *   3. Auth      — every route, event streams included
+ *   1. Host    — reject a rebound hostname before anything else runs
+ *   2. Origin  — reject a foreign browser origin before touching the token, so
+ *                a hostile page learns nothing about token validity
+ *   3. Auth    — every route, event streams included
  *   4. Handler
  *
- * `/healthz` skips 3 and returns only liveness.
+ * `/healthz` skips step 3 and returns only liveness.
  */
 
 function matchRoute(method: string, pathname: string): RouteSpec | null {
@@ -38,12 +57,34 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(payload);
 }
 
+const MAX_BODY_BYTES = 1_000_000;
+
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    // Bounded so a local process cannot exhaust memory through an open port.
+    if (size > MAX_BODY_BYTES) throw new Error("request body too large");
+    chunks.push(chunk as Buffer);
+  }
+  if (chunks.length === 0) return {};
+  return JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+}
+
+function sessionIdFrom(pathname: string): SessionId | null {
+  const raw = pathname.split("/")[2];
+  return raw && isId(raw, "session") ? raw : null;
+}
+
 export async function startDaemon(options: DaemonOptions): Promise<DaemonHandle> {
   const host = options.host ?? "127.0.0.1";
   const stateDir = options.stateDir ?? join(tmpdir(), "dem-state");
+  const provider: Provider = options.provider ?? new FakeProvider();
+  const store: SessionStore = await openSessionStore(options.dbPath ?? join(stateDir, "app.db"));
+
   const token = mintToken();
   const tokenFile = await writeTokenFile(stateDir, token);
-
   if (!tokenFile.restricted) {
     // Loud rather than silent: the user should know their credential is
     // readable by more than themselves before they rely on this.
@@ -54,36 +95,127 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonHandle>
   }
 
   const server = createServer();
+  const inFlight = new Map<SessionId, AbortController>();
   let selfOrigin = "";
   let boundPort = 0;
 
   server.on("request", (req: IncomingMessage, res: ServerResponse) => {
-    const url = new URL(req.url ?? "/", selfOrigin);
-    const route = matchRoute(req.method ?? "GET", url.pathname);
+    void (async () => {
+      const url = new URL(req.url ?? "/", "http://placeholder");
 
-    if (!isAllowedHost(req.headers.host, boundPort)) {
-      send(res, 403, { error: "forbidden", reason: "host_not_allowed" });
-      return;
-    }
-    if (!isAllowedOrigin(req.headers.origin, selfOrigin)) {
-      send(res, 403, { error: "forbidden", reason: "origin_not_allowed" });
-      return;
-    }
-    if (!route) {
-      send(res, 404, { error: "not_found" });
-      return;
-    }
-
-    if (route.authenticated) {
-      const presented = bearerFrom(req.headers.authorization);
-      if (presented === null || !tokenMatches(presented, token)) {
-        send(res, 401, { error: "unauthenticated" });
+      if (!isAllowedHost(req.headers.host, boundPort)) {
+        send(res, 403, { error: "forbidden", reason: "host_not_allowed" });
         return;
       }
-    }
+      if (!isAllowedOrigin(req.headers.origin, selfOrigin)) {
+        send(res, 403, { error: "forbidden", reason: "origin_not_allowed" });
+        return;
+      }
 
-    handle(route, url, res);
+      const route = matchRoute(req.method ?? "GET", url.pathname);
+      if (!route) {
+        send(res, 404, { error: "not_found" });
+        return;
+      }
+
+      if (route.authenticated) {
+        const presented = bearerFrom(req.headers.authorization);
+        if (presented === null || !tokenMatches(presented, token)) {
+          send(res, 401, { error: "unauthenticated" });
+          return;
+        }
+      }
+
+      try {
+        await handle(route, req, res, url);
+      } catch (err) {
+        send(res, 500, { error: "internal", message: (err as Error).message });
+      }
+    })();
   });
+
+  async function handle(
+    route: RouteSpec,
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+  ): Promise<void> {
+    switch (route.path) {
+      case "/healthz":
+        send(res, 200, HEALTHZ_BODY);
+        return;
+
+      case "/models":
+        send(res, 200, {
+          models: [{ id: provider.id, capabilities: provider.capabilities() }],
+        });
+        return;
+
+      case "/tools":
+        // No tool broker yet; an empty list is the honest answer.
+        send(res, 200, { tools: [] });
+        return;
+
+      case "/sessions": {
+        const body = await readJson(req);
+        const workspace = typeof body["workspace"] === "string" ? body["workspace"] : options.workspace;
+        const session = await createSession(store, workspace);
+        send(res, 201, { id: session.id, workspace: session.workspace });
+        return;
+      }
+
+      case "/sessions/:id/messages": {
+        const id = sessionIdFrom(url.pathname);
+        if (!id || !(await store.get(id))) {
+          send(res, 404, { error: "not_found" });
+          return;
+        }
+        if (inFlight.has(id)) {
+          // One active mutating run per session (SPEC section 22).
+          send(res, 409, { error: "run_busy" });
+          return;
+        }
+        const body = await readJson(req);
+        const content = typeof body["content"] === "string" ? body["content"] : "";
+
+        const abort = new AbortController();
+        inFlight.set(id, abort);
+        try {
+          await runMessage(store, provider, id, content, abort.signal);
+        } finally {
+          inFlight.delete(id);
+        }
+        send(res, 202, { accepted: true });
+        return;
+      }
+
+      case "/sessions/:id/events": {
+        const id = sessionIdFrom(url.pathname);
+        if (!id || !(await store.get(id))) {
+          send(res, 404, { error: "not_found" });
+          return;
+        }
+        const since = Number(url.searchParams.get("since") ?? 0);
+        send(res, 200, { events: await readEvents(store, id, Number.isFinite(since) ? since : 0) });
+        return;
+      }
+
+      case "/sessions/:id/cancel": {
+        const id = sessionIdFrom(url.pathname);
+        if (!id || !(await store.get(id))) {
+          send(res, 404, { error: "not_found" });
+          return;
+        }
+        inFlight.get(id)?.abort();
+        send(res, 200, { cancelled: true });
+        return;
+      }
+
+      default:
+        send(res, 501, { error: "not_implemented", route: route.path });
+        return;
+    }
+  }
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -98,33 +230,12 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonHandle>
   return {
     url: selfOrigin,
     token,
-    close: () =>
-      new Promise<void>((resolve, reject) =>
+    close: async () => {
+      for (const controller of inFlight.values()) controller.abort();
+      await new Promise<void>((resolve, reject) =>
         server.close((err) => (err ? reject(err) : resolve())),
-      ),
+      );
+      await store.close();
+    },
   };
-}
-
-/**
- * Route handlers. Only what Phase 1 step 2 owns is answered; the rest reports
- * 501 until its own test turns red and gets implemented in order. Returning a
- * plausible empty result here would turn a later suite green without a module
- * behind it.
- */
-function handle(route: RouteSpec, _url: URL, res: ServerResponse): void {
-  switch (route.path) {
-    case "/healthz":
-      send(res, 200, HEALTHZ_BODY);
-      return;
-    case "/models":
-      // No provider adapter exists yet, so the honest answer is an empty list.
-      send(res, 200, { models: [] });
-      return;
-    case "/tools":
-      send(res, 200, { tools: [] });
-      return;
-    default:
-      send(res, 501, { error: "not_implemented", route: route.path });
-      return;
-  }
 }

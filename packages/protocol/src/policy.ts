@@ -104,3 +104,9 @@ export interface ScopedConfig {
   /** Non-security settings follow ordinary precedence. */
   settings?: Record<string, unknown>;
 }
+
+/** Well-known capability names (SPEC section 4). Providers may publish others. */
+export const CAP_TEXT_GENERATE = "text.generate";
+export const CAP_TEXT_REASON = "text.reason";
+export const CAP_VISION_ANALYZE = "vision.analyze";
+export const CAP_TOOL_CALL = "tool.call";

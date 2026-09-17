@@ -6,6 +6,8 @@
  * tool output (invariant 4).
  */
 
+import type { Provider } from "./provider.js";
+
 export interface RouteSpec {
   method: "GET" | "POST";
   /** Path pattern with `:param` segments. */
@@ -54,6 +56,14 @@ export interface DaemonOptions {
   workspace: string;
   /** Where the bearer token file lives. Created 0600 / current-user ACL. */
   stateDir?: string;
+  /** SQLite path. Defaults to `<stateDir>/app.db`. */
+  dbPath?: string;
+  /**
+   * Text provider backing this daemon. Injected rather than resolved from
+   * config so tests can run the whole API against FakeProvider with no model
+   * present.
+   */
+  provider?: Provider;
 }
 
 export interface DaemonHandle {
