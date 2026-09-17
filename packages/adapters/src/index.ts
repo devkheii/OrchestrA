@@ -10,3 +10,5 @@ export { ClaudeCliProvider } from "./claude-cli.js";
 export type { ClaudeCliConfig } from "./claude-cli.js";
 export { ClaudeCodeAgent } from "./claude-code-agent.js";
 export type { ClaudeCodeAgentConfig } from "./claude-code-agent.js";
+export { CodexAgent } from "./codex-agent.js";
+export type { CodexAgentConfig } from "./codex-agent.js";

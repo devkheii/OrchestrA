@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { resolveProvider, startDaemon } from "@dem/daemon";
 import { applyDelegated, delegate } from "@dem/engine";
-import { ClaudeCodeAgent } from "@dem/adapters";
+import { ClaudeCodeAgent, CodexAgent } from "@dem/adapters";
 import type { DaemonHandle, SessionEvent } from "@dem/protocol";
 
 /**
@@ -32,7 +32,8 @@ const HELP = `dem — local-first AI agent harness
 
 Usage:
   dem run <prompt>     run one prompt to completion and print the answer
-  dem delegate <task>  hand the whole task to an external agent (Claude Code)
+  dem delegate <task>  hand the whole task to an external agent
+                       DEM_AGENT=claude-code (default) or codex
   dem models           list providers this daemon can reach
   dem help             show this message
 
@@ -103,7 +104,20 @@ export async function main(argv: readonly string[], io: Io = consoleIo): Promise
  * consenting to an unseen diff at the moment of deciding whether to start.
  */
 async function runDelegation(task: string, io: Io): Promise<number> {
-  const agent = new ClaudeCodeAgent({ model: process.env["DEM_MODEL"] ?? "sonnet" });
+  // Two vendors, chosen explicitly. Later a council of both is the point: two
+  // agents that share a failure mode agree confidently and wrongly.
+  const which = process.env["DEM_AGENT"] ?? "claude-code";
+  const model = process.env["DEM_MODEL"];
+  const agent =
+    which === "codex"
+      ? new CodexAgent(model ? { model } : {})
+      : new ClaudeCodeAgent({ model: model ?? "sonnet" });
+
+  if (which !== "codex" && which !== "claude-code") {
+    io.err(`dem: unknown agent "${which}"; expected claude-code or codex
+`);
+    return 2;
+  }
 
   if (!agent.isLocal() && process.env["DEM_ALLOW_REMOTE"] !== "1") {
     io.err(
