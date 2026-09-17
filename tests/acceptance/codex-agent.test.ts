@@ -29,8 +29,13 @@ function agent(extra: Record<string, unknown> = {}) {
 function argvFrom(log: string): string[] {
   for (const line of log.split("\n")) {
     if (!line.trim()) continue;
-    const frame = JSON.parse(line) as { msg?: { type?: string; argv?: string[] } };
-    if (frame.msg?.type === "session_configured") return frame.msg.argv ?? [];
+    let frame: { type?: string; argv?: string[] };
+    try {
+      frame = JSON.parse(line) as { type?: string; argv?: string[] };
+    } catch {
+      continue;
+    }
+    if (frame.type === "session_configured") return frame.argv ?? [];
   }
   return [];
 }
@@ -131,34 +136,66 @@ describe("Codex agent: producing work", () => {
 });
 
 describe("Codex agent: failure is not silent success", () => {
-  it("treats a fatal error event as failure even when the process exits zero", async () => {
-    // Observed with the real CLI: a model too new for the installed version
-    // produced retries, then an error, then exit 0. Trusting the exit code
-    // would turn a run that did nothing into a success with an empty diff —
-    // and an empty diff is indistinguishable from "nothing needed doing".
+  it("fails a turn that failed, though the process exited zero (0.154 shape)", async () => {
+    // Observed with the real CLI: a rejected model produces an error event, a
+    // failed turn, and exit 0. Trusting the exit code would turn a run that
+    // did nothing into a success with an empty diff — and an empty diff is
+    // indistinguishable from "nothing needed changing".
     await withTempDir(async (dir) => {
       const result = await delegate(agent(), {
         workspace: dir,
-        task: "SCENARIO_STALE_CLI",
+        task: "SCENARIO_TURN_FAILED",
         approved: true,
       });
 
       expect(result.ok).toBe(false);
       expect(result.applied).toBe(false);
+      expect(result.agentLog).toContain("not supported");
+    });
+  });
+
+  it("still reads the pre-0.40 wrapped error shape", async () => {
+    // The vocabulary changed between versions. Supporting both means a user on
+    // either one gets a real failure rather than silent success.
+    await withTempDir(async (dir) => {
+      const result = await delegate(agent(), {
+        workspace: dir,
+        task: "SCENARIO_LEGACY_ERROR",
+        approved: true,
+      });
+      expect(result.ok).toBe(false);
       expect(result.agentLog).toContain("newer version of Codex");
     });
   });
 
-  it("does not mistake a retry for a verdict", async () => {
-    // `stream_error` is a retry in progress. Reading it as fatal would fail
-    // runs that went on to succeed.
+  it("does not fail a run over an item-level warning", async () => {
+    // "Model metadata not found, defaulting to fallback" arrives as an item
+    // with type `error` on runs that then succeed. Reading every error-shaped
+    // item as fatal would fail working runs.
     await withTempDir(async (dir) => {
       const result = await delegate(agent(), {
         workspace: dir,
-        task: "create a file",
+        task: "SCENARIO_ITEM_WARNING",
+        approved: true,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.applied).toBe(true);
+      expect(await readFile(join(dir, "CODEX.md"), "utf8")).toBe("written by codex\n");
+    });
+  });
+
+  it("requires a completed turn rather than merely an absence of errors", async () => {
+    // Positive evidence. "No error was seen" would call a run successful
+    // whenever a failure arrived in a shape not yet known — which is exactly
+    // how the previous version of this adapter broke.
+    await withTempDir(async (dir) => {
+      const result = await delegate(agent(), {
+        workspace: dir,
+        task: "SCENARIO_TURN_FAILED",
         approved: false,
       });
-      expect(result.ok).toBe(true);
+      expect(result.ok).toBe(false);
     });
   });
 

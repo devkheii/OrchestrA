@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { AgentRun, AgentResult, ExternalAgent } from "@dem/engine";
 
 /**
@@ -72,8 +74,10 @@ export class CodexAgent implements ExternalAgent {
       "-",
     ];
 
+    const launch = await this.resolveLaunch();
+
     return new Promise<AgentResult>((resolve) => {
-      const child = spawn(this.command(), args, {
+      const child = spawn(launch.command, [...launch.prefix, ...args], {
         cwd: run.workdir,
         ...(this.config.env ? { env: this.config.env } : {}),
         stdio: ["pipe", "pipe", "pipe"],
@@ -105,14 +109,20 @@ export class CodexAgent implements ExternalAgent {
         }
 
         const log = stdout || stderr;
+        const verdict = readVerdict(stdout);
 
-        // Codex reports some failures as an `error` event while still exiting
-        // zero — a model the installed CLI is too old for does exactly that.
-        // Trusting the exit code alone would turn a run that did nothing into
-        // a successful one with an empty diff.
-        const failed = fatalError(stdout);
-        if (failed) {
-          resolve({ ok: false, log: `${failed}\n\n${log}` });
+        if (verdict.fatal) {
+          resolve({ ok: false, log: `${verdict.fatal}\n\n${log}` });
+          return;
+        }
+
+        // Success is confirmed, not assumed. Codex exits zero on failure — a
+        // rejected model produces retries, an error event, a failed turn, and
+        // still `exit 0`. Asking for a completed turn is positive evidence;
+        // "no error was seen" is only the absence of one, and would call a run
+        // successful whenever a failure arrived in a shape not yet known.
+        if (verdict.sawTurn && !verdict.completed) {
+          resolve({ ok: false, log: `codex did not complete its turn\n\n${log}` });
           return;
         }
 
@@ -124,9 +134,51 @@ export class CodexAgent implements ExternalAgent {
     });
   }
 
-  private command(): string {
-    return this.config.command ?? "codex";
+  /**
+   * How to start Codex.
+   *
+   * npm installs it as `bin/codex.js` plus platform shims. On Windows the shim
+   * is a `.cmd`, which Node refuses to spawn without `shell: true` — and a
+   * shell would then reparse our arguments, at which point a workspace path
+   * containing a space, or a `-c key="value"` override, breaks in ways that
+   * are tedious to see. Running the JS entry point under node avoids the shell
+   * entirely, so the argument vector we build is the one Codex receives.
+   *
+   * Resolved once and cached; the fallback is the bare name, which is correct
+   * wherever a real executable is on PATH.
+   */
+  private async resolveLaunch(): Promise<{ command: string; prefix: string[] }> {
+    if (this.config.command) return { command: this.config.command, prefix: [] };
+    if (this.launch) return this.launch;
+
+    const entry = await findGlobalEntry();
+    this.launch = entry
+      ? { command: process.execPath, prefix: [entry] }
+      : { command: "codex", prefix: [] };
+
+    return this.launch;
   }
+
+  private launch?: { command: string; prefix: string[] };
+}
+
+/** `@openai/codex/bin/codex.js` in the global npm root, if it is there. */
+async function findGlobalEntry(): Promise<string | null> {
+  const root = await new Promise<string | null>((resolve) => {
+    const npm = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["root", "-g"], {
+      stdio: ["ignore", "pipe", "ignore"],
+      shell: process.platform === "win32",
+    });
+    let out = "";
+    npm.stdout.on("data", (d: Buffer) => (out += d.toString()));
+    npm.on("error", () => resolve(null));
+    npm.on("close", (code) => resolve(code === 0 ? out.trim() : null));
+  });
+
+  if (!root) return null;
+
+  const entry = join(root, "@openai", "codex", "bin", "codex.js");
+  return existsSync(entry) ? entry : null;
 }
 
 /**
@@ -143,20 +195,65 @@ const ISOLATION_OVERRIDES = [
   'approval_policy="never"',
 ];
 
-/** The last fatal `error` event in a JSONL stream, if any. */
-function fatalError(stdout: string): string | null {
-  let found: string | null = null;
+interface Verdict {
+  fatal: string | null;
+  sawTurn: boolean;
+  completed: boolean;
+}
+
+interface CodexFrame {
+  type?: string;
+  message?: string;
+  error?: { message?: string };
+  item?: { type?: string; message?: string };
+  /** Pre-0.154 wrapped everything in `msg`. */
+  msg?: { type?: string; message?: string };
+}
+
+/**
+ * Read a verdict out of the JSONL stream.
+ *
+ * Two event vocabularies are handled because the CLI changed one under us.
+ * Up to 0.40 every frame was wrapped in `msg`; from 0.154 the type is
+ * top-level and turns are bracketed by `turn.started` / `turn.completed`.
+ * Supporting both costs a few lines and means a user on either version gets
+ * correct failure reporting rather than silent success.
+ *
+ * The distinction that matters most is which errors are fatal. An
+ * `item.completed` carrying `type: "error"` may be a warning — "model metadata
+ * not found, defaulting to fallback" arrives exactly that way on a run that
+ * then succeeds. Treating it as fatal would fail working runs. Only a
+ * top-level `error`, a `turn.failed`, or the old wrapped `error` end a run.
+ */
+function readVerdict(stdout: string): Verdict {
+  const verdict: Verdict = { fatal: null, sawTurn: false, completed: false };
 
   for (const line of stdout.split("\n")) {
     if (!line.trim()) continue;
+
+    let frame: CodexFrame;
     try {
-      const frame = JSON.parse(line) as { msg?: { type?: string; message?: string } };
-      // `stream_error` is a retry in progress, not a verdict; only the plain
-      // `error` event means the run gave up.
-      if (frame.msg?.type === "error") found = frame.msg.message ?? "codex reported an error";
+      frame = JSON.parse(line) as CodexFrame;
     } catch {
-      // Not JSONL — human-readable output from an older CLI. Left alone.
+      // Not JSONL — human-readable output. Left alone.
+      continue;
+    }
+
+    // 0.154+
+    if (frame.type === "turn.started") verdict.sawTurn = true;
+    if (frame.type === "turn.completed") verdict.completed = true;
+    if (frame.type === "turn.failed") {
+      verdict.fatal = frame.error?.message ?? "codex turn failed";
+    }
+    if (frame.type === "error") {
+      verdict.fatal = frame.message ?? "codex reported an error";
+    }
+
+    // <= 0.40. `stream_error` there is a retry in progress, not a verdict.
+    if (frame.msg?.type === "error") {
+      verdict.fatal = frame.msg.message ?? "codex reported an error";
     }
   }
-  return found;
+
+  return verdict;
 }

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { resolveProvider, startDaemon } from "@dem/daemon";
 import { applyDelegated, delegate } from "@dem/engine";
 import { ClaudeCodeAgent, CodexAgent } from "@dem/adapters";
+import type { ProposedChange } from "@dem/engine";
 import type { DaemonHandle, SessionEvent } from "@dem/protocol";
 
 /**
@@ -144,34 +145,78 @@ async function runDelegation(task: string, io: Io): Promise<number> {
     return 0;
   }
 
-  io.err(`[1m${outcome.changes.length} file(s) proposed[0m\n`);
-  for (const change of outcome.changes) {
-    io.err(`  ${change.kind === "create" ? "+" : "~"} ${change.path}\n`);
-  }
+  io.err(`\n[1m${outcome.changes.length} file(s) proposed[0m\n`);
+  outcome.changes.forEach((change, i) => {
+    io.err(`  ${i + 1}. ${change.kind === "create" ? "+" : "~"} ${change.path}\n`);
+  });
 
-  const approved = await askApproval(
-    {
-      call: { id: "delegation", name: "apply changes", arguments: {} },
-      rule: "guarantees were suspended while the agent ran",
-    },
-    io,
-  );
-  if (!approved) {
-    io.err("\nnot applied\n");
+  const selected = await selectChanges(outcome.changes, io);
+  if (selected.length === 0) {
+    io.err("\nnothing applied\n");
     return 1;
   }
 
   // Applies the change set already shown, rather than running the agent again.
   // A second run would cost a second call and, worse, produce a different diff
   // from the one the user just approved.
-  const applied = await applyDelegated(process.cwd(), outcome.changes);
+  const applied = await applyDelegated(process.cwd(), selected);
   if (!applied.applied) {
     io.err(`\nnot applied: changed underneath — ${applied.conflicts.join(", ")}\n`);
     return 1;
   }
 
-  io.out(`applied ${outcome.changes.length} file(s)\n`);
+  io.out(`applied ${selected.length} file(s)\n`);
   return 0;
+}
+
+/**
+ * Choose which proposed files to take.
+ *
+ * All-or-nothing is the wrong shape here. An agent working in a copy leaves
+ * its own litter behind — a real run of this produced the file it was asked
+ * for plus a stray `stdout` from a shell redirect — and a user who wants one
+ * and not the other should not have to choose between taking junk and
+ * discarding the work.
+ */
+async function selectChanges(
+  changes: readonly ProposedChange[],
+  io: Io,
+): Promise<ProposedChange[]> {
+  io.err("\n[2mguarantees were suspended while the agent ran[0m\n");
+  io.err("apply? [a]ll / [n]one / numbers e.g. 1,3 : ");
+
+  if (!process.stdin.isTTY) {
+    // A pipe cannot consent. Defaulting to all would make every scripted run
+    // apply whatever an agent happened to leave in the copy.
+    io.err("\nno tty; declining\n");
+    return [];
+  }
+
+  const answer = await readLine();
+  io.err("\n");
+
+  const trimmed = answer.trim().toLowerCase();
+  if (trimmed === "a" || trimmed === "all" || trimmed === "y") return [...changes];
+  if (!trimmed || trimmed === "n" || trimmed === "none") return [];
+
+  const picked = new Set(
+    trimmed
+      .split(/[,\s]+/)
+      .map((n) => Number.parseInt(n, 10))
+      .filter((n) => Number.isInteger(n) && n >= 1 && n <= changes.length),
+  );
+  return changes.filter((_, i) => picked.has(i + 1));
+}
+
+function readLine(): Promise<string> {
+  return new Promise((resolve) => {
+    process.stdin.setEncoding("utf8");
+    process.stdin.resume();
+    process.stdin.once("data", (chunk: string) => {
+      process.stdin.pause();
+      resolve(chunk);
+    });
+  });
 }
 
 interface RunOutcome {
