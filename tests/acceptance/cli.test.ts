@@ -57,6 +57,7 @@ describe("dem CLI", () => {
   it("lists the provider the daemon actually reaches", async () => {
     const io = capture();
     expect(await main(["models"], io)).toBe(0);
+    expect(io.stdout).toContain("LOCAL");
     expect(io.stdout).toContain("fake");
     expect(io.stdout).toContain("text.generate");
   });

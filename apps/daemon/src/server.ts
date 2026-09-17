@@ -12,7 +12,7 @@ import {
   type SessionId,
 } from "@dem/protocol";
 import { openSessionStore, type SessionStore } from "@dem/engine";
-import { FakeProvider } from "@dem/adapters";
+import { resolveProvider } from "./provider-config.js";
 import {
   bearerFrom,
   isAllowedHost,
@@ -80,7 +80,8 @@ function sessionIdFrom(pathname: string): SessionId | null {
 export async function startDaemon(options: DaemonOptions): Promise<DaemonHandle> {
   const host = options.host ?? "127.0.0.1";
   const stateDir = options.stateDir ?? join(tmpdir(), "dem-state");
-  const provider: Provider = options.provider ?? new FakeProvider();
+  // An injected provider wins, so tests run without touching the environment.
+  const provider: Provider = options.provider ?? resolveProvider(process.env).provider;
   const store: SessionStore = await openSessionStore(options.dbPath ?? join(stateDir, "app.db"));
 
   const token = mintToken();

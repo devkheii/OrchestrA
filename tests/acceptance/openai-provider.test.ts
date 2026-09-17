@@ -1,0 +1,173 @@
+import { describe, expect, it } from "vitest";
+import type { ModelEvent } from "@dem/protocol";
+import { OpenAICompatibleProvider } from "@dem/adapters";
+import { delta, finish, startFakeOpenAI } from "../helpers/openai-server.js";
+
+/**
+ * The first real provider: llama.cpp's server, a local gateway, or a hosted
+ * OpenAI-compatible API (plan 4.4).
+ *
+ * Also SEC-014 at its actual boundary. Invariant 17 says the audit trail holds
+ * no hidden reasoning; the only way to keep that promise is to drop the
+ * reasoning channel where it enters the system, because after that it is
+ * indistinguishable from an answer.
+ */
+
+async function collect(stream: AsyncIterable<ModelEvent>): Promise<ModelEvent[]> {
+  const out: ModelEvent[] = [];
+  for await (const event of stream) out.push(event);
+  return out;
+}
+
+const REQUEST = { messages: [{ role: "user" as const, content: "hello" }] };
+
+describe("OpenAI-compatible provider: streaming", () => {
+  it("yields content deltas in order and a terminal done", async () => {
+    const server = await startFakeOpenAI({
+      frames: [delta("Hel"), delta("lo"), finish("stop")],
+    });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: server.url, model: "test" });
+      const events = await collect(provider.run(REQUEST));
+
+      const text = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
+      expect(text).toBe("Hello");
+      expect(events.at(-1)).toEqual({ type: "done", reason: "stop" });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("reports a truncated answer as length, not as a clean stop", async () => {
+    // A caller that cannot tell "finished" from "ran out of room" will treat a
+    // half-written patch as complete.
+    const server = await startFakeOpenAI({ frames: [delta("partial"), finish("length")] });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: server.url, model: "test" });
+      const events = await collect(provider.run(REQUEST));
+      expect(events.at(-1)).toEqual({ type: "done", reason: "length" });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("skips a malformed frame instead of failing the whole stream", async () => {
+    const server = await startFakeOpenAI({
+      rawLines: [
+        `data: ${JSON.stringify(delta("good"))}`,
+        "data: {not json",
+        ": a comment line servers send as a keepalive",
+        `data: ${JSON.stringify(delta(" parts"))}`,
+        "data: [DONE]",
+      ],
+    });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: server.url, model: "test" });
+      const events = await collect(provider.run(REQUEST));
+      const text = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
+      expect(text).toBe("good parts");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("stops when the caller aborts mid-stream", async () => {
+    const server = await startFakeOpenAI({
+      frames: [delta("a"), delta("b"), delta("c"), delta("d"), finish("stop")],
+      frameDelayMs: 40,
+    });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: server.url, model: "test" });
+      const abort = new AbortController();
+      const seen: string[] = [];
+
+      for await (const event of provider.run(REQUEST, { signal: abort.signal })) {
+        if (event.type === "delta") {
+          seen.push(event.text);
+          if (seen.length === 2) abort.abort();
+        }
+      }
+
+      expect(seen.length).toBeLessThan(4);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe("OpenAI-compatible provider: invariant 17 at the boundary", () => {
+  it("never emits the reasoning channel as answer text", async () => {
+    const server = await startFakeOpenAI({
+      frames: [
+        { choices: [{ delta: { reasoning_content: "the user probably means..." } }] },
+        { choices: [{ delta: { content: "42", reasoning: "because 6x7" } }] },
+        finish("stop"),
+      ],
+    });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: server.url, model: "test" });
+      const events = await collect(provider.run(REQUEST));
+      const text = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
+
+      expect(text).toBe("42");
+      expect(JSON.stringify(events)).not.toContain("probably means");
+      expect(JSON.stringify(events)).not.toContain("6x7");
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe("OpenAI-compatible provider: failure and identity", () => {
+  it("surfaces an upstream error as an event rather than throwing mid-loop", async () => {
+    const server = await startFakeOpenAI({ errorStatus: 503 });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: server.url, model: "test" });
+      const events = await collect(provider.run(REQUEST));
+      expect(events.at(-1)?.type).toBe("error");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("reports health honestly when the endpoint is unreachable", async () => {
+    const provider = new OpenAICompatibleProvider({
+      // Reserved TEST-NET-1; nothing answers here.
+      baseUrl: "http://192.0.2.1:9",
+      model: "test",
+      timeoutMs: 300,
+    });
+    const health = await provider.health();
+    expect(health.ok).toBe(false);
+  });
+
+  it("sends the API key as a header and keeps it out of its own identity", async () => {
+    const server = await startFakeOpenAI({ frames: [finish("stop")] });
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: server.url,
+        model: "test",
+        apiKey: "sk-should-not-appear",
+      });
+      await collect(provider.run(REQUEST));
+
+      expect(server.requests[0]?.headers["authorization"]).toBe("Bearer sk-should-not-appear");
+      // The id ends up in audit records and event payloads.
+      expect(provider.id).not.toContain("sk-");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("classifies a loopback endpoint as local and a public one as remote", () => {
+    const local = new OpenAICompatibleProvider({ baseUrl: "http://127.0.0.1:8080", model: "m" });
+    const alsoLocal = new OpenAICompatibleProvider({ baseUrl: "http://localhost:8080", model: "m" });
+    const remote = new OpenAICompatibleProvider({ baseUrl: "https://api.example.com", model: "m" });
+
+    // This decides whether a call is egress at all (invariant 2). A local
+    // llama.cpp server is not a third party; an API endpoint is.
+    expect(local.isLocal()).toBe(true);
+    expect(alsoLocal.isLocal()).toBe(true);
+    expect(remote.isLocal()).toBe(false);
+  });
+});

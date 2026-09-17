@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { startDaemon } from "@dem/daemon";
+import { resolveProvider, startDaemon } from "@dem/daemon";
 import type { DaemonHandle, SessionEvent } from "@dem/protocol";
 
 /**
@@ -59,6 +59,12 @@ export async function main(argv: readonly string[], io: Io = consoleIo): Promise
 
     case "models":
       return withDaemon(io, async (daemon) => {
+        const selection = resolveProvider(process.env);
+        // Privacy posture is stated before the model list, not inferred from
+        // it. Whether context leaves the machine is the first thing a user
+        // needs to know and the easiest thing to forget you configured.
+        io.out(`${selection.local ? "LOCAL " : "REMOTE"}  ${selection.label}\n\n`);
+
         const res = await fetch(`${daemon.url}/models`, {
           headers: { authorization: `Bearer ${daemon.token}` },
         });
