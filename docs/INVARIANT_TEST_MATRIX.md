@@ -28,8 +28,8 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 3 | Permission and sandbox are independent layers | `SEC-008`, `SEC-010` | permissions, runtime | deferred (v0.2-alpha) — sandbox adapter lands with the counterexample runner |
 | 4 | Every endpoint authenticated (except minimal `/healthz`) | `SEC-001` | daemon | green |
 | 5 | Host/Origin validation, CORS deny-by-default | `SEC-002` | daemon | green |
-| 6 | Secrets never in context/memory/audit/child env/UI | `SEC-005`, `SEC-015` | secrets, audit, context | todo (v0.1) |
-| 7 | Child processes get a sanitized environment | `SEC-005` | runtime, permissions | todo (v0.1) |
+| 6 | Secrets never in context/memory/audit/child env/UI | `SEC-005`, `SEC-015` | secrets, audit, context | green |
+| 7 | Child processes get a sanitized environment | `SEC-005` | runtime, permissions | green |
 | 8 | Path access checked by canonical/real path | `SEC-003`, `SEC-004` | policy, tools | green |
 | 9 | Untrusted content cannot become instruction | `SEC-016` | context | todo (v0.1) |
 | 10 | Tainted run receives stricter AUTO | `SEC-007` | context, permissions | deferred (v0.2-alpha) — AUTO does not exist in v0.1 (SPEC §19.1) |

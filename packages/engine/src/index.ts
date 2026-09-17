@@ -10,3 +10,5 @@ export * from "./audit/replay.js";
 export * from "./session/store.js";
 export * from "./compaction/checkpoint.js";
 export * from "./tools/patch.js";
+export * from "./tools/shell.js";
+export * from "./runtime/kill.js";

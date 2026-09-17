@@ -22,8 +22,6 @@ const STUBS: Stub[] = [
     inputTokens: 0, outputTokens: 0, wallTimeMs: 0, remoteCost: 0, rounds: 0,
     counterexampleExecutions: 0,
   }, {}) },
-  { name: "sanitizeChildEnv", call: () => engine.sanitizeChildEnv({}) },
-  { name: "redact", call: () => engine.redact("t", []) },
   { name: "assemblePrompt", call: () => engine.assemblePrompt([]) },
   { name: "taintOf", call: () => engine.taintOf([]) },
   { name: "stripReasoningChannel", call: () => engine.stripReasoningChannel({}) },
@@ -48,6 +46,8 @@ const STUBS: Stub[] = [
  *   Phase 1 step 3 — session/event persistence (RUN-004)
  *   Phase 1 step 7 — path guard and egress       (SEC-003, SEC-004, SEC-006)
  *   Phase 1 step 8 — permission broker           (SEC-008)
+ *   Phase 1 step 9 — sanitized env, shell exec   (SEC-005)
+ *   Phase 1 step 10 — secret redaction           (SEC-015)
  *
  * The probe below calls each with valid but inert arguments: it checks the
  * wiring, not the behaviour. Behaviour belongs to the named suites.
@@ -64,6 +64,10 @@ const IMPLEMENTED: Stub[] = [
   { name: "selectableModes", call: () => engine.selectableModes("UNAVAILABLE") },
   { name: "segmentCommand", call: () => engine.segmentCommand("a") },
   { name: "decide", call: () => engine.decide({ action: "read", mode: "ASK", taint: "CLEAN", sandbox: "UNAVAILABLE", subject: "x" }) },
+  { name: "sanitizeChildEnv", call: () => engine.sanitizeChildEnv({}) },
+  { name: "redact", call: () => engine.redact("t", []) },
+  { name: "execCommand", call: () => typeof engine.execCommand },
+  { name: "killProcessTree", call: () => typeof engine.killProcessTree },
 ];
 
 /** Test IDs declared in docs/SPEC.md section 31. */

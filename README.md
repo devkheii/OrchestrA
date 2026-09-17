@@ -49,7 +49,12 @@ A test goes red before its module is written. `tests/phase0-contract.test.ts` is
 
 - Node 20.18+ (developed on 20; `scripts/` avoids Node 22-only APIs)
 - pnpm 12+
-- Reference environment on Windows is **WSL2**. Native Windows runs the harness but has no sandbox adapter, so `AUTO` is unavailable and `ASK` is the ceiling — see SPEC §19.1. The `SEC-004` symlink test needs a host that can create symlinks.
+- Reference environment on Windows is **WSL2**. Native Windows runs the harness but has no sandbox adapter, so `AUTO` is unavailable and `ASK` is the ceiling — see SPEC §19.1.
+
+Two native-Windows caveats, both absent under WSL2:
+
+- **Process tree cleanup is best-effort.** POSIX spawns children detached and kills the whole group at once. Windows has no equivalent here, and `taskkill /t /f` was measured at a consistent ~3.8s on a managed host, so waiting for it would stall every cancel and timeout by that much. The direct child is terminated immediately and the tree walk runs unawaited, which can leave an orphan under a deep tree.
+- **`SEC-004` needs a link the host can create.** A file symlink requires Developer Mode or elevation; a directory junction requires neither. The fixture builds both and throws if it can get neither, rather than letting the test pass unexercised.
 
 ## Scope of v0.1
 
