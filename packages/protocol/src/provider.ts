@@ -7,12 +7,16 @@
  */
 
 export interface ModelMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /** Set on a tool result, linking it to the call it answers. */
+  toolCallId?: string;
 }
 
 export interface ModelRequest {
   messages: ModelMessage[];
+  /** Tools the model may request. Absent means text only. */
+  tools?: readonly ToolDefinition[];
   temperature?: number;
   maxOutputTokens?: number;
 }
@@ -27,8 +31,22 @@ export interface ModelRequest {
 export type ModelEvent =
   | { type: "delta"; text: string }
   | { type: "rationale"; text: string }
+  | { type: "tool_call"; call: ToolCall }
   | { type: "done"; reason: "stop" | "length" | "cancelled" }
   | { type: "error"; message: string };
+
+/** A tool the model may call. Shape follows the OpenAI function-tool schema. */
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
 
 export interface RunContext {
   /** Cancellation propagates here (SPEC section 23). */

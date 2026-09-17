@@ -80,6 +80,11 @@ The core differentiation is:
 33. **Memory scopes do not leak.** A workspace only ever retrieves its own workspace memory; session and agent memory stay within their session and agent; global memory is shared by design and is written conservatively. One project's notes never surface while working on another.
 34. **Delegation to an external agent is bounded and recorded as a suspension of guarantees.** The agent never runs against the live workspace, its output re-enters through the harness's own patch path, its logs are imported as an opaque artifact rather than presented as our event trail, and the decision record states that guarantees were suspended (§4.2).
 35. **A model's reasoning is either a public rationale or it is not kept.** A model-authored summary may be stored and shown, separately from the answer and labelled as rationale. A raw reasoning channel is dropped where it arrives, and is never concatenated into the answer — once mixed in, it cannot be told apart from one (§15.1).
+36. **Tool execution cannot bypass the Permission Broker.** Every tool call — whoever requested it, whatever mode the session is in — is decided by the broker before it runs, and the decision is recorded. There is no path from a model's output to an effect that skips this step.
+37. **A child agent or task inherits the parent's policy, or a stricter one.** Delegation never widens permission, privacy, egress or budget. A sub-task cannot do what the task that spawned it was refused.
+38. **An online benchmark score is never presented as a local measurement.** A published figure describes some other machine's build of a model; it is labelled as a prior and never shown as, or recorded as, something measured on this hardware with this quantization.
+39. **Hard constraints are not scoreable.** Privacy, capability, context capacity, resource fit and budget are filters applied before scoring. No score, weight or preference can readmit a candidate that failed one.
+40. **Scheduling estimates are evidence, not claims.** An ETA or score is recorded alongside the actual outcome, so a prediction can be checked against what happened rather than standing on its own.
 
 Every invariant maps to at least one automated test ID; see §32 and `docs/INVARIANT_TEST_MATRIX.md`.
 
@@ -1102,7 +1107,10 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `SEC-016` instruction-shaped text inside file/web content does not become system or user instruction;
 - `SEC-017` memory written in one workspace is not retrievable from another;
 - `SEC-018` a delegated external-agent run never touches the live workspace, and its result re-enters through the harness patch path;
-- `SEC-019` a raw reasoning channel is never stored or concatenated into the answer, while a summarized rationale is kept as a separate labelled event.
+- `SEC-019` a raw reasoning channel is never stored or concatenated into the answer, while a summarized rationale is kept as a separate labelled event;
+- `SEC-020` a tool call cannot reach execution without a Permission Broker decision, and the decision is recorded;
+- `SEC-021` a child agent or task cannot hold a wider permission, privacy, egress or budget policy than its parent;
+- `ORCH-007` an online benchmark score is labelled as a prior and never reported as a local measurement.
 
 **Decision**
 
@@ -1159,6 +1167,10 @@ Invariant | Test IDs | Implementation module | Status
 ```
 
 No release may contain an invariant without a test or an explicit documented exception. An invariant whose feature is not yet implemented carries status `deferred (<release>)`, never a blank.
+
+**Removing an invariant is an explicit act.** Six invariants were lost between v2.1 and v2.2 — tool execution bypassing the permission broker, child-policy inheritance, memory scope isolation, and three about benchmark and scheduling honesty. None was argued down; the list was renumbered and they fell out. A tool that checks invariants against tests cannot catch this, because an invariant with no row has nothing to check.
+
+So an invariant leaves this document only by being moved to the Exceptions section with a reason, and the matrix carries a provenance column naming the revision each invariant came from. A future revision that renumbers the list can then be diffed against its predecessor rather than read for what it gained.
 
 ---
 

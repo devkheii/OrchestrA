@@ -38,6 +38,11 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 33 | Memory scopes do not leak across workspaces | `SEC-017` | memory | green |
 | 34 | External-agent delegation is bounded and recorded as suspended guarantees | `SEC-018` | adapters, session | deferred (v0.3) — ExternalAgentAdapter is not built yet |
 | 35 | Reasoning is a public rationale or it is not kept | `SEC-019` | adapters, audit | green |
+| 36 | Tool execution cannot bypass the Permission Broker | `SEC-020` | permissions, tools | green — restored from v2.1 #7 |
+| 37 | A child agent or task inherits the parent policy or stricter | `SEC-021` | policy, adapters | deferred (v0.3) — restored from v2.1 #27; no child tasks exist yet |
+| 38 | An online benchmark score is never presented as a local measurement | `ORCH-007` | benchmark | deferred (v0.3) — restored from v2.1 #20 |
+| 39 | Hard constraints are not scoreable | `ORCH-005` | orchestrator | deferred (v0.3) — restored from v2.1 #23; the test survived, the invariant did not |
+| 40 | Scheduling estimates are evidence, not claims | `ORCH-002` | orchestrator | deferred (v0.3) — restored from v2.1 #25; the test survived, the invariant did not |
 | 31 | Model-authored code runs only in a healthy sandbox, never against the live workspace | `SEC-009`, `SEC-010`, `SEC-011`, `SEC-012` | counterexample, runtime | deferred (v0.2-alpha) |
 
 Note on #21: the invariant is testable in v0.1 even though the sandbox adapter is absent. The v0.1 assertion is the negative one — with no sandbox present, AUTO and FULL_ACCESS must be unselectable. The positive case (healthy sandbox enables AUTO) is added in v0.2-alpha.
@@ -96,13 +101,32 @@ Additional orchestrator tests required by SPEC §31: `ORCH-001` (OBSERVE does no
 
 | Release | Invariants that must be `green` |
 |---|---|
-| v0.1 | 1, 2, 4, 5, 6, 7, 8, 9, 16, 17, 20, 21, 26, 27, 28, 29, 33, 35 |
+| v0.1 | 1, 2, 4, 5, 6, 7, 8, 9, 16, 17, 20, 21, 26, 27, 28, 29, 33, 35, 36 |
 | v0.2-alpha | + 3, 10, 11, 12, 13, 14, 15, 31 |
 | v0.2-beta | + 18, 22, 23, 30, 32 |
-| v0.3 | + 24, 34 |
+| v0.3 | + 24, 34, 37, 38, 39, 40 |
 | v0.3.1 | + 19 |
 | v0.4 | + 25 |
-| 1.0 | all 35, plus the efficacy gate of SPEC §28 |
+| 1.0 | all 40, plus the efficacy gate of SPEC §28 |
+
+---
+
+## Provenance
+
+Every invariant here traces to a revision. Six were lost between v2.1 and v2.2 without being argued down — the list was renumbered and they fell out, and two reviews of that revision missed it because each was read for what it added rather than for what it no longer said.
+
+Restored, with their original numbering:
+
+| Now | Was | Lost in |
+|---|---|---|
+| #33 | v1 #13, v2.1 #13 | v2.2 |
+| #36 | v1 #7, v2.1 #7 | v2.2 |
+| #37 | v2.1 #27 | v2.2 |
+| #38 | v2.1 #20 | v2.2 |
+| #39 | v2.1 #23 | v2.2 (test `ORCH-005` survived) |
+| #40 | v2.1 #25 | v2.2 (test `ORCH-002` survived) |
+
+SPEC §32 now requires removal to be explicit. When the next revision renumbers, diff it against its predecessor.
 
 ---
 
