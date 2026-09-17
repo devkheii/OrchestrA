@@ -7,13 +7,19 @@ A local-first, auditable AI agent harness. The repository is `OrchestrA`; the ha
 
 **Status: v0.1 feature-complete.** All seventeen v0.1 invariants are green: authenticated daemon, path guard, permission broker, secret isolation, egress policy, memory scoping, audit and replay, cancellation, budgets, conflict detection, compaction.
 
-`dem run "hello"` completes end to end. Point it at a local model with:
+`dem run "hello"` completes end to end. Point it at a model with either:
 
 ```sh
+# A local OpenAI-compatible server (llama.cpp, a gateway)
 DEM_BASE_URL=http://127.0.0.1:8080 DEM_MODEL=qwen pnpm run dem run "..."
+
+# Or the Claude Code CLI, reusing credentials you already have
+DEM_PROVIDER=claude-cli DEM_MODEL=sonnet DEM_ALLOW_REMOTE=1 pnpm run dem run "..."
 ```
 
-A non-loopback endpoint is refused unless `DEM_ALLOW_REMOTE=1`, and `dem models` states `LOCAL` or `REMOTE` before listing anything.
+Anything that sends context off the machine is refused unless `DEM_ALLOW_REMOTE=1`, and `dem models` states `LOCAL` or `REMOTE` before listing anything. The Claude CLI counts as remote even though the binary is local: the gate follows the data, not the executable.
+
+Under a Claude subscription the CLI is not billed per request — it draws on the account's rate-limit window, which is the same one you use for your own work. The harness's tests never call it for that reason.
 
 The permission ceiling is `ASK` and stays there until a sandbox adapter lands in v0.2 (SPEC §19.1).
 

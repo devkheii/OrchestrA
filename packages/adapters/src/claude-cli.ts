@@ -31,6 +31,15 @@ import type {
  * 3. **The prompt goes over stdin, never argv.** Command lines are visible to
  *    any process that can list processes, so an argv prompt leaks whatever the
  *    user asked about to every other program on the machine.
+ *
+ * **On cost.** Running under a Claude subscription, a call is not billed per
+ * request: it draws on the account's rate-limit window, and when that window is
+ * exhausted requests are refused rather than charged. The `total_cost_usd` the
+ * CLI reports is an equivalent-API-cost figure, not money spent. So when this
+ * is wired to the budget ceilings in SPEC section 24, it must be recorded as a
+ * quota proxy — treating it as spend would either block a user who is not being
+ * charged, or quietly imply a bill that does not exist. The real scarce resource
+ * here is the same five-hour window the user needs for their own work.
  */
 
 export interface ClaudeCliConfig {

@@ -6,9 +6,10 @@ import { ClaudeCliProvider } from "@dem/adapters";
 /**
  * The Claude Code CLI as a text provider.
  *
- * Run against a stand-in rather than the real binary: real calls cost money
- * and take seconds, and a suite that charges per run is a suite that stops
- * being run. The stand-in emits the same stream-json frames the real CLI does.
+ * Run against a stand-in rather than the real binary. A real call spends the
+ * user's Claude subscription quota — the same five-hour window they use for
+ * their own work — so a suite that called it would compete with the person
+ * running it. The stand-in emits the same stream-json frames the real CLI does.
  */
 
 const FAKE_CLI = fileURLToPath(new URL("../helpers/fake-claude-cli.mjs", import.meta.url));

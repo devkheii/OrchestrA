@@ -2,10 +2,11 @@
 /**
  * A stand-in for the Claude Code CLI that emits the same stream-json frames.
  *
- * Real calls cost money and take seconds, so the adapter's behaviour — frame
- * parsing, thinking suppression, cancellation, error handling — is exercised
- * against this instead. A test suite that charges per run is a test suite that
- * stops being run.
+ * A real call spends the user's Claude subscription quota — the same five-hour
+ * window they use for their own work — and takes seconds. So the adapter's
+ * behaviour (frame parsing, thinking suppression, cancellation, error handling)
+ * is exercised against this instead. A suite that eats the quota it is meant to
+ * protect is a suite that stops being run.
  *
  * Behaviour is driven by the prompt it receives on stdin, so a test picks a
  * scenario by asking for it.
