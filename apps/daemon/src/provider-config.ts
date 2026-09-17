@@ -36,6 +36,30 @@ export interface ProviderEnv {
   DEM_ALLOW_REMOTE?: string | undefined;
 }
 
+/**
+ * Choose a provider from resolved settings rather than raw environment.
+ *
+ * `resolveProvider` below still takes the environment directly, because a
+ * daemon started without a workspace has nothing else to read. This is the
+ * form the CLI uses once it has loaded config files (SPEC §33), so a user can
+ * write the model down once instead of re-typing five variables.
+ */
+export function providerFromSettings(settings: {
+  provider?: string | undefined;
+  model?: string | undefined;
+  baseUrl?: string | undefined;
+  apiKey?: string | undefined;
+  allowRemote: boolean;
+}): ProviderSelection {
+  return resolveProvider({
+    ...(settings.provider ? { DEM_PROVIDER: settings.provider } : {}),
+    ...(settings.model ? { DEM_MODEL: settings.model } : {}),
+    ...(settings.baseUrl ? { DEM_BASE_URL: settings.baseUrl } : {}),
+    ...(settings.apiKey ? { DEM_API_KEY: settings.apiKey } : {}),
+    ...(settings.allowRemote ? { DEM_ALLOW_REMOTE: "1" } : {}),
+  });
+}
+
 export function resolveProvider(env: ProviderEnv): ProviderSelection {
   if (env.DEM_PROVIDER === "anthropic") {
     const key = env.DEM_API_KEY ?? env.ANTHROPIC_API_KEY;

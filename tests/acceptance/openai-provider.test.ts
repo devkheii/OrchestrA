@@ -177,3 +177,34 @@ describe("OpenAI-compatible provider: failure and identity", () => {
     expect(remote.isLocal()).toBe(false);
   });
 });
+
+describe("OpenAI-compatible provider: a refused connection explains itself", () => {
+  it("names the local server that is not running, and how to start one", async () => {
+    // Node reports a refused connection as a bare "fetch failed", which tells
+    // a user neither what was unreachable nor what to do about it. For a
+    // local-first harness the cause is almost always a model server that was
+    // never started.
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: "http://127.0.0.1:1",
+      model: "none",
+    });
+    const events = await collect(provider.run(REQUEST));
+    const error = events.at(-1);
+
+    expect(error?.type).toBe("error");
+    const message = error?.type === "error" ? error.message : "";
+    expect(message).toContain("127.0.0.1:1");
+    expect(message).toContain("llama serve");
+  });
+
+  it("does not claim a local server is missing when the endpoint is remote", async () => {
+    const provider = new OpenAICompatibleProvider({
+      // Reserved TEST-NET-1; nothing answers.
+      baseUrl: "http://192.0.2.1:9",
+      model: "none",
+    });
+    const events = await collect(provider.run(REQUEST));
+    const message = events.at(-1)?.type === "error" ? (events.at(-1) as { message: string }).message : "";
+    expect(message).not.toContain("llama serve");
+  });
+});

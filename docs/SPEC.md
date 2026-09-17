@@ -1129,7 +1129,8 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `SEC-020` a tool call cannot reach execution without a Permission Broker decision, and the decision is recorded;
 - `SEC-021` a child agent or task cannot hold a wider permission, privacy, egress or budget policy than its parent;
 - `ORCH-007` an online benchmark score is labelled as a prior and never reported as a local measurement;
-- `SEC-022` a model narrating a tool call it did not make fails the run instead of having its fabricated result reported as an answer.
+- `SEC-022` a model narrating a tool call it did not make fails the run instead of having its fabricated result reported as an answer;
+- `SEC-023` a literal credential in a config file is refused, and a malformed config file fails loudly rather than being skipped.
 
 **Decision**
 
@@ -1209,7 +1210,11 @@ Environment sits directly below CLI so that CI, container, and headless executio
 
 Security composition is monotonic: lower scopes may tighten but not weaken hard safety constraints (invariant 29). This applies to the environment channel too — an environment variable cannot widen a global deny.
 
-Secrets are resolved independently via Secret Broker and never flow through this chain.
+Secrets are resolved independently via Secret Broker and never flow through this chain. A config file may hold a *reference* (`env://NAME`, `secret://...`) but never a literal credential: config files get committed, so a key written there is a key in that repository's history. The loader refuses one and names the field.
+
+A config file that cannot be read or parsed fails the load rather than being skipped. Silently falling back leaves a user believing their settings — including `maxMode` and `remoteEgress` — are in force when they are not.
+
+Config is read from `.dem/config.json` in the workspace and in the user's home directory.
 
 ---
 

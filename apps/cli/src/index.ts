@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { resolveProvider, startDaemon } from "@dem/daemon";
-import { applyDelegated, delegate } from "@dem/engine";
+import { providerFromSettings, startDaemon } from "@dem/daemon";
+import { applyDelegated, delegate, resolveSettings, type Settings } from "@dem/engine";
 import { ClaudeCodeAgent, CodexAgent } from "@dem/adapters";
 import type { ProposedChange } from "@dem/engine";
 import type { DaemonHandle, SessionEvent } from "@dem/protocol";
@@ -34,16 +34,76 @@ const HELP = `dem — local-first AI agent harness
 Usage:
   dem run <prompt>     run one prompt to completion and print the answer
   dem delegate <task>  hand the whole task to an external agent
-                       DEM_AGENT=claude-code (default) or codex
   dem models           list providers this daemon can reach
   dem help             show this message
+
+Options (override config for this run):
+  --model <name>       model to use
+  --provider <kind>    anthropic | claude-cli | (default: OpenAI-compatible)
+  --agent <kind>       claude-code | codex, for delegate
+  --allow-remote       permit anything that sends context off this machine
+
+Configuration is read from .dem/config.json in this workspace and in your home
+directory, then the environment, then these flags (SPEC 33). Write the model
+down once instead of re-typing it:
+
+  {"baseUrl": "http://127.0.0.1:8099", "model": "qwen-coder"}
+
+Credentials go in the environment, or in config as a reference such as
+"apiKey": "env://ANTHROPIC_API_KEY" — never as a literal, because config
+files get committed.
 
 Status: v0.1 in progress. Permission mode is ASK and cannot be raised:
 no sandbox adapter ships in v0.1, and AUTO without one is not offered.
 `;
 
-export async function main(argv: readonly string[], io: Io = consoleIo): Promise<number> {
-  const [command, ...rest] = argv;
+/**
+ * Settings for this invocation, from flags, environment and config files
+ * (SPEC 33). Loaded once so every command sees the same answer, and so a
+ * config error is reported before any work starts rather than halfway in.
+ */
+async function settingsFor(argv: readonly string[]): Promise<Settings> {
+  const cli: Record<string, unknown> = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--model" && argv[i + 1]) cli["model"] = argv[++i];
+    else if (arg === "--provider" && argv[i + 1]) cli["provider"] = argv[++i];
+    else if (arg === "--agent" && argv[i + 1]) cli["agent"] = argv[++i];
+    else if (arg === "--allow-remote") cli["allowRemote"] = true;
+  }
+
+  return resolveSettings({
+    workspace: process.cwd(),
+    home: homedir(),
+    env: process.env,
+    cli,
+  });
+}
+
+/** Strip the flags settingsFor consumed, leaving the command and its words. */
+function withoutFlags(argv: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--model" || arg === "--provider" || arg === "--agent") { i++; continue; }
+    if (arg === "--allow-remote") continue;
+    out.push(arg);
+  }
+  return out;
+}
+
+export async function main(rawArgv: readonly string[], io: Io = consoleIo): Promise<number> {
+  let settings: Settings;
+  try {
+    settings = await settingsFor(rawArgv);
+  } catch (err) {
+    // A config that does not apply is reported before anything runs.
+    io.err(`dem: ${(err as Error).message}
+`);
+    return 2;
+  }
+
+  const [command, ...rest] = withoutFlags(rawArgv);
 
   switch (command) {
     case undefined:
@@ -59,12 +119,12 @@ export async function main(argv: readonly string[], io: Io = consoleIo): Promise
         io.err("dem run: a prompt is required\n");
         return 2;
       }
-      return withDaemon(io, (daemon) => runOnce(daemon, prompt, io));
+      return withDaemon(settings, io, (daemon) => runOnce(daemon, prompt, io));
     }
 
     case "models":
-      return withDaemon(io, async (daemon) => {
-        const selection = resolveProvider(process.env);
+      return withDaemon(settings, io, async (daemon) => {
+        const selection = providerFromSettings(settings);
         // Privacy posture is stated before the model list, not inferred from
         // it. Whether context leaves the machine is the first thing a user
         // needs to know and the easiest thing to forget you configured.
@@ -86,7 +146,7 @@ export async function main(argv: readonly string[], io: Io = consoleIo): Promise
         io.err("dem delegate: a task is required\n");
         return 2;
       }
-      return runDelegation(task, io);
+      return runDelegation(task, settings, io);
     }
 
     default:
@@ -104,27 +164,27 @@ export async function main(argv: readonly string[], io: Io = consoleIo): Promise
  * with the file list in view. Collapsing them into one question would mean
  * consenting to an unseen diff at the moment of deciding whether to start.
  */
-async function runDelegation(task: string, io: Io): Promise<number> {
+async function runDelegation(task: string, settings: Settings, io: Io): Promise<number> {
   // Two vendors, chosen explicitly. Later a council of both is the point: two
   // agents that share a failure mode agree confidently and wrongly.
-  const which = process.env["DEM_AGENT"] ?? "claude-code";
-  const model = process.env["DEM_MODEL"];
+  const which = settings.agent ?? "claude-code";
+
+  if (which !== "codex" && which !== "claude-code") {
+    io.err(`dem: unknown agent "${which}"; expected claude-code or codex\n`);
+    return 2;
+  }
+
+  const model = settings.model;
   const agent =
     which === "codex"
       ? new CodexAgent(model ? { model } : {})
       : new ClaudeCodeAgent({ model: model ?? "sonnet" });
 
-  if (which !== "codex" && which !== "claude-code") {
-    io.err(`dem: unknown agent "${which}"; expected claude-code or codex
-`);
-    return 2;
-  }
-
-  if (!agent.isLocal() && process.env["DEM_ALLOW_REMOTE"] !== "1") {
+  if (!agent.isLocal() && !settings.allowRemote) {
     io.err(
       `dem: delegating to ${agent.id} sends the task and the files it reads to a third party, ` +
         `and suspends this harness's guarantees while it runs. ` +
-        `Set DEM_ALLOW_REMOTE=1 to accept that.\n`,
+        `Pass --allow-remote, or set "allowRemote": true in .dem/config.json.\n`,
     );
     return 1;
   }
@@ -285,9 +345,25 @@ async function askApproval(
   });
 }
 
-async function withDaemon(io: Io, fn: (d: DaemonHandle) => Promise<number>): Promise<number> {
+async function withDaemon(
+  settings: Settings,
+  io: Io,
+  fn: (d: DaemonHandle) => Promise<number>,
+): Promise<number> {
   const stateDir = defaultStateDir();
-  const daemon = await startDaemon({ workspace: process.cwd(), stateDir });
+
+  // The provider comes from resolved settings, so a model written once in
+  // .dem/config.json is the model the daemon runs with.
+  let provider;
+  try {
+    provider = providerFromSettings(settings).provider;
+  } catch (err) {
+    io.err(`dem: ${(err as Error).message}
+`);
+    return 1;
+  }
+
+  const daemon = await startDaemon({ workspace: process.cwd(), stateDir, provider });
   try {
     return await fn(daemon);
   } catch (err) {

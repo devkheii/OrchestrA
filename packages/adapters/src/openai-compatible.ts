@@ -122,7 +122,12 @@ export class OpenAICompatibleProvider implements Provider {
       }
       // Surfaced as an event, not thrown: the caller is iterating a stream and
       // a throw there unwinds a loop that may hold a session open.
-      yield { type: "error", message: `request failed: ${(err as Error).message}` };
+      //
+      // A bare "fetch failed" is what Node gives for a refused connection, and
+      // it tells a user nothing they can act on. The common case by far is a
+      // local model server that is not running, so the message says that and
+      // names the address it tried.
+      yield { type: "error", message: unreachable(err, this.config.baseUrl) };
       return;
     }
 
@@ -278,6 +283,28 @@ async function* sseFrames(
     // aborted run leaks a connection per cancellation.
     await reader.cancel().catch(() => {});
   }
+}
+
+/**
+ * Turn a connection failure into something the user can act on.
+ *
+ * Node reports a refused connection as a bare "fetch failed", which names
+ * neither what was being reached nor what to do. For a local-first harness the
+ * overwhelmingly common cause is a model server that is not running.
+ */
+function unreachable(err: unknown, baseUrl: string): string {
+  const message = (err as Error).message ?? String(err);
+  const refused = /fetch failed|ECONNREFUSED|ENOTFOUND|EAI_AGAIN/i.test(message);
+
+  if (!refused) return `request failed: ${message}`;
+
+  const host = hostOf(baseUrl);
+  const isLoopback = /^(127\.0\.0\.1|localhost|\[?::1\]?)(:|$)/.test(host);
+
+  return isLoopback
+    ? `could not reach a model server at ${baseUrl}. Start one, for example:\n` +
+        `  llama serve -m <model>.gguf --port ${host.split(":")[1] ?? "8080"}`
+    : `could not reach ${baseUrl}: ${message}`;
 }
 
 function trimEnd(url: string): string {
