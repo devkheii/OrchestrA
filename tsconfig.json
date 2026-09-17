@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@dem/protocol": ["packages/protocol/src/index.ts"],
+      "@dem/engine": ["packages/engine/src/index.ts"],
+      "@dem/adapters": ["packages/adapters/src/index.ts"],
+      "@dem/daemon": ["apps/daemon/src/index.ts"],
+      "@dem/cli": ["apps/cli/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "tests/**/*.ts", "scripts/**/*.mjs"]
+}
