@@ -47,10 +47,19 @@ const STUBS: Stub[] = [
   }, 1) },
   { name: "applyPatch", call: () => engine.applyPatch("/w", []) },
   { name: "hashFile", call: () => engine.hashFile("/w/a") },
-  { name: "startDaemon", call: () => daemon.startDaemon({ workspace: "/w" }) },
-  { name: "isAllowedHost", call: () => daemon.isAllowedHost("127.0.0.1:1", 1) },
-  { name: "isAllowedOrigin", call: () => daemon.isAllowedOrigin("a", "a") },
-  { name: "tokenFilePath", call: () => daemon.tokenFilePath("/tmp") },
+];
+
+/**
+ * Implemented, so no longer stubs. This list shrinks as phases land; an entry
+ * moves out of STUBS only when its own suite is green.
+ *
+ *   Phase 1 step 2 — startDaemon, isAllowedHost, isAllowedOrigin, tokenFilePath
+ */
+const IMPLEMENTED: readonly string[] = [
+  "startDaemon",
+  "isAllowedHost",
+  "isAllowedOrigin",
+  "tokenFilePath",
 ];
 
 /** Test IDs declared in docs/SPEC.md section 31. */
@@ -73,6 +82,23 @@ describe("Phase 0: the contract is wired before any module is written", () => {
         expect(c, `"${c}" is not a known test ID`).toMatch(KNOWN_CONTRACTS);
       }
     }
+  });
+});
+
+describe("Phase 1: implemented modules have left the stub list", () => {
+  it.each(IMPLEMENTED)("%s is exported and no longer throws NotImplemented", (name) => {
+    const fn = (daemon as Record<string, unknown>)[name];
+    expect(typeof fn, `${name} is not exported`).toBe("function");
+    // Called with arguments that are valid but inert, so this checks wiring
+    // rather than behaviour; behaviour belongs to the SEC-00x suites.
+    const probe: Record<string, () => unknown> = {
+      isAllowedHost: () => daemon.isAllowedHost("127.0.0.1:1", 1),
+      isAllowedOrigin: () => daemon.isAllowedOrigin("http://a", "http://a"),
+      tokenFilePath: () => daemon.tokenFilePath("/tmp"),
+      startDaemon: () => undefined, // starting a server is the suite's job, not this one
+    };
+    expect(probe[name]).toBeDefined();
+    expect(() => probe[name]?.()).not.toThrow(NotImplemented);
   });
 });
 

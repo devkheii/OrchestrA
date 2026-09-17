@@ -26,8 +26,8 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 1 | Local is the default execution/privacy mode | `SEC-006` | policy, adapters | todo (v0.1) |
 | 2 | File read never implies remote egress | `SEC-006` | policy, permissions | todo (v0.1) |
 | 3 | Permission and sandbox are independent layers | `SEC-008`, `SEC-010` | permissions, runtime | deferred (v0.2-alpha) — sandbox adapter lands with the counterexample runner |
-| 4 | Every endpoint authenticated (except minimal `/healthz`) | `SEC-001` | daemon | todo (v0.1) |
-| 5 | Host/Origin validation, CORS deny-by-default | `SEC-002` | daemon | todo (v0.1) |
+| 4 | Every endpoint authenticated (except minimal `/healthz`) | `SEC-001` | daemon | green |
+| 5 | Host/Origin validation, CORS deny-by-default | `SEC-002` | daemon | green |
 | 6 | Secrets never in context/memory/audit/child env/UI | `SEC-005`, `SEC-015` | secrets, audit, context | todo (v0.1) |
 | 7 | Child processes get a sanitized environment | `SEC-005` | runtime, permissions | todo (v0.1) |
 | 8 | Path access checked by canonical/real path | `SEC-003`, `SEC-004` | policy, tools | todo (v0.1) |
