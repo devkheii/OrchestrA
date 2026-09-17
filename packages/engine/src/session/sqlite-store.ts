@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import { makeId } from "@dem/protocol";
 import type { SessionEvent, SessionEventInput, SessionId } from "@dem/protocol";
 import type { SessionRecord, SessionStore } from "./store.js";
+import type { Checkpoint } from "../compaction/checkpoint.js";
 
 /**
  * SQLite-backed session store (test RUN-004).
@@ -38,6 +39,15 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE INDEX IF NOT EXISTS events_by_session ON events(session_id, seq);
+
+-- Checkpoints sit beside the transcript, never inside it (invariant 16).
+CREATE TABLE IF NOT EXISTS checkpoints (
+  session_id  TEXT NOT NULL REFERENCES sessions(id),
+  through_seq INTEGER NOT NULL,
+  created_at  TEXT NOT NULL,
+  payload     TEXT NOT NULL,
+  PRIMARY KEY (session_id, through_seq)
+);
 `;
 
 interface SessionRow {
@@ -101,6 +111,13 @@ export function openSessionStore(dbPath: string): Promise<SessionStore> {
     return { ...event, seq } as SessionEvent;
   });
 
+  const upsertCheckpoint = db.prepare<[string, number, string, string]>(
+    "INSERT OR REPLACE INTO checkpoints (session_id, through_seq, created_at, payload) VALUES (?, ?, ?, ?)",
+  );
+  const selectLatestCheckpoint = db.prepare<[string]>(
+    "SELECT payload FROM checkpoints WHERE session_id = ? ORDER BY through_seq DESC LIMIT 1",
+  );
+
   const store: SessionStore = {
     async create(workspace: string): Promise<SessionRecord> {
       const record: SessionRecord = {
@@ -126,6 +143,20 @@ export function openSessionStore(dbPath: string): Promise<SessionStore> {
     async events(id: SessionId, sinceSeq = 0): Promise<SessionEvent[]> {
       const rows = selectEvents.all(id, sinceSeq) as EventRow[];
       return rows.map((row) => ({ ...JSON.parse(row.payload), seq: row.seq }) as SessionEvent);
+    },
+
+    async saveCheckpoint(checkpoint: Checkpoint): Promise<void> {
+      upsertCheckpoint.run(
+        checkpoint.sessionId,
+        checkpoint.throughSeq,
+        checkpoint.createdAt,
+        JSON.stringify(checkpoint),
+      );
+    },
+
+    async latestCheckpoint(id: SessionId): Promise<Checkpoint | null> {
+      const row = selectLatestCheckpoint.get(id) as { payload: string } | undefined;
+      return row ? (JSON.parse(row.payload) as Checkpoint) : null;
     },
 
     async close(): Promise<void> {

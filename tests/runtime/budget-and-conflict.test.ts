@@ -76,7 +76,7 @@ describe("RUN-003: concurrent edits are detected, not overwritten", () => {
       const hash = await hashFile(file);
 
       const [result] = await applyPatch(dir, [
-        { kind: "update", path: "a.txt", expectedHash: hash, hunks: "patched\n" },
+        { kind: "update", path: "a.txt", expectedHash: hash, content: "patched\n" },
       ]);
 
       expect(result?.applied).toBe(true);
@@ -95,7 +95,7 @@ describe("RUN-003: concurrent edits are detected, not overwritten", () => {
 
       await expect(
         applyPatch(dir, [
-          { kind: "update", path: "a.txt", expectedHash: staleHash, hunks: "patched\n" },
+          { kind: "update", path: "a.txt", expectedHash: staleHash, content: "patched\n" },
         ]),
       ).rejects.toBeInstanceOf(StaleWrite);
 
@@ -129,8 +129,8 @@ describe("RUN-003: concurrent edits are detected, not overwritten", () => {
 
       await expect(
         applyPatch(dir, [
-          { kind: "update", path: "a.txt", expectedHash: hashA, hunks: "a patched\n" },
-          { kind: "update", path: "b.txt", expectedHash: staleB, hunks: "b patched\n" },
+          { kind: "update", path: "a.txt", expectedHash: hashA, content: "a patched\n" },
+          { kind: "update", path: "b.txt", expectedHash: staleB, content: "b patched\n" },
         ]),
       ).rejects.toBeInstanceOf(StaleWrite);
 

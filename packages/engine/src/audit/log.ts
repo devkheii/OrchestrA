@@ -1,4 +1,5 @@
-import { NotImplemented } from "@dem/protocol";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 /**
  * Decision/audit trail (invariants 17 and 20; tests SEC-014, RUN-006).
@@ -45,8 +46,19 @@ export interface AuditLog {
  * persisted or shown. Applied at the adapter boundary so no downstream module
  * has to remember (invariant 17).
  */
-export function stripReasoningChannel(_raw: unknown): unknown {
-  throw new NotImplemented("stripReasoningChannel", "SEC-014");
+export function stripReasoningChannel(raw: unknown): unknown {
+  if (Array.isArray(raw)) return raw.map(stripReasoningChannel);
+  if (raw === null || typeof raw !== "object") return raw;
+
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    // Matched recursively and case-insensitively: providers nest the reasoning
+    // channel inside choices and messages, and the field name drifts between
+    // versions. Dropping the key outright beats trying to sanitise its content.
+    if (REASONING_FIELDS.includes(key.toLowerCase())) continue;
+    out[key] = stripReasoningChannel(value);
+  }
+  return out;
 }
 
 /** Field names providers use for hidden reasoning. Checked, not trusted. */
@@ -57,9 +69,58 @@ export const REASONING_FIELDS: readonly string[] = [
   "thought",
   "scratchpad",
   "chain_of_thought",
+  "reasoning_details",
   "internal",
 ];
 
-export function openAuditLog(_dir: string): Promise<AuditLog> {
-  throw new NotImplemented("openAuditLog", "RUN-004");
+/**
+ * Append-only JSONL on disk.
+ *
+ * A file rather than a table because the audit trail should outlive the schema
+ * that indexed it, and should stay readable with `tail` when the daemon is the
+ * thing being debugged. The SQLite index is built over this, never instead
+ * of it.
+ */
+export async function openAuditLog(dir: string): Promise<AuditLog> {
+  await mkdir(dir, { recursive: true });
+  const file = join(dir, "audit.jsonl");
+
+  return {
+    async append(record: AuditRecord): Promise<void> {
+      // Reasoning-channel content is stripped at the boundary so no caller has
+      // to remember (invariant 17).
+      const clean = stripReasoningChannel(record) as AuditRecord;
+      await appendFile(file, JSON.stringify(clean) + "\n", "utf8");
+    },
+
+    async read(decisionOrSession: string): Promise<AuditRecord[]> {
+      let text: string;
+      try {
+        text = await readFile(file, "utf8");
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+        throw err;
+      }
+
+      const out: AuditRecord[] = [];
+      for (const line of text.split("\n")) {
+        if (!line.trim()) continue;
+        let record: AuditRecord;
+        try {
+          record = JSON.parse(line) as AuditRecord;
+        } catch {
+          // A torn final line from a crash mid-write. Skipping it is right:
+          // the rest of the trail is still valid and still worth reading.
+          continue;
+        }
+        if (
+          record["decision_id"] === decisionOrSession ||
+          record["session_id"] === decisionOrSession
+        ) {
+          out.push(record);
+        }
+      }
+      return out;
+    },
+  };
 }

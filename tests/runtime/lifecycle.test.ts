@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { cancelRun, openSessionStore, replayDryRun, writeCheckpoint } from "@dem/engine";
+import {
+  cancelRun,
+  openAuditLog,
+  openSessionStore,
+  replayDryRun,
+  writeCheckpoint,
+} from "@dem/engine";
 import { withTempDir } from "../helpers/temp.js";
 
 /**
@@ -172,7 +178,8 @@ describe("RUN-005: compaction leaves the canonical transcript intact", () => {
         }
         const before = await store.events(session.id);
 
-        await writeCheckpoint(session.id, before.length);
+        const checkpoint = await writeCheckpoint(store, session.id, before.length);
+        expect(checkpoint.throughSeq).toBe(before.length);
 
         const after = await store.events(session.id);
         expect(after.length).toBe(before.length);
@@ -188,24 +195,87 @@ describe("RUN-005: compaction leaves the canonical transcript intact", () => {
  * RUN-006 — invariant 20.
  *
  * Dry-run is inspection. It reports whether a decision could be reconstructed
- * and changes nothing while doing so.
+ * and changes nothing while doing so. The goal is replayable provenance, not
+ * bitwise reproduction: local GPU inference does not promise the latter even
+ * at a fixed seed, and claiming it would be a lie in the audit trail.
  */
+
+const PROVENANCE = {
+  provider: "fake",
+  model: "fake",
+  promptHash: "p1",
+  contextHash: "c1",
+  evidenceHashes: ["e1"],
+  startedAt: "2026-09-17T00:00:00.000Z",
+  endedAt: "2026-09-17T00:00:01.000Z",
+};
 
 describe("RUN-006: replay --dry-run inspects without side effects", () => {
   it("reports a reconstruction status for each recorded input", async () => {
-    const report = await replayDryRun("dec_test");
-    const items = report.items.map((i) => i.item);
-    expect(items).toContain("model_fingerprint");
-    expect(items).toContain("context_hash");
-    expect(items).toContain("permission_policy");
-    for (const item of report.items) {
-      expect(["reconstructible", "missing", "changed"]).toContain(item.status);
-    }
+    await withTempDir(async (dir) => {
+      const log = await openAuditLog(dir);
+      await log.append({
+        type: "decision.completed",
+        at: PROVENANCE.startedAt,
+        decision_id: "dec_test",
+        provenance: PROVENANCE,
+        tools: ["read"],
+        verifiers: [],
+        permissionPolicy: { mode: "ASK" },
+      });
+
+      const report = await replayDryRun(log, "dec_test");
+      const items = report.items.map((i) => i.item);
+      expect(items).toContain("model_fingerprint");
+      expect(items).toContain("context_hash");
+      expect(items).toContain("permission_policy");
+      for (const item of report.items) {
+        expect(["reconstructible", "missing", "changed"]).toContain(item.status);
+      }
+    });
   });
 
   it("marks a decision whose recorded model is gone as missing, not reconstructible", async () => {
-    const report = await replayDryRun("dec_missing_model");
-    const fingerprint = report.items.find((i) => i.item === "model_fingerprint");
-    expect(fingerprint?.status).toBe("missing");
+    await withTempDir(async (dir) => {
+      const log = await openAuditLog(dir);
+      await log.append({
+        type: "decision.completed",
+        at: PROVENANCE.startedAt,
+        decision_id: "dec_missing_model",
+        // No provenance was captured: the honest answer is "missing", not a
+        // cheerful "reconstructible" for a decision nobody can reproduce.
+        tools: [],
+      });
+
+      const report = await replayDryRun(log, "dec_missing_model");
+      const fingerprint = report.items.find((i) => i.item === "model_fingerprint");
+      expect(fingerprint?.status).toBe("missing");
+    });
+  });
+
+  it("reports every item as missing for a decision id that was never recorded", async () => {
+    await withTempDir(async (dir) => {
+      const log = await openAuditLog(dir);
+      const report = await replayDryRun(log, "dec_never_happened");
+      expect(report.items.length).toBeGreaterThan(0);
+      expect(report.items.every((i) => i.status === "missing")).toBe(true);
+    });
+  });
+
+  it("survives a daemon restart, since the audit log is a file not a buffer", async () => {
+    await withTempDir(async (dir) => {
+      const first = await openAuditLog(dir);
+      await first.append({
+        type: "decision.completed",
+        at: PROVENANCE.startedAt,
+        decision_id: "dec_persisted",
+        provenance: PROVENANCE,
+      });
+
+      const second = await openAuditLog(dir);
+      const records = await second.read("dec_persisted");
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({ decision_id: "dec_persisted" });
+    });
   });
 });

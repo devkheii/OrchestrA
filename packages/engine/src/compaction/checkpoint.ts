@@ -1,17 +1,24 @@
-import { NotImplemented } from "@dem/protocol";
-import type { SessionId } from "@dem/protocol";
+import type { SessionEvent, SessionId } from "@dem/protocol";
+import type { SessionStore } from "../session/store.js";
 
 /**
  * Compaction (invariant 16, test RUN-005).
  *
- * The canonical transcript is append-only and is never rewritten. A checkpoint
- * is an additional artifact that the working context may be built from; if the
- * summary turns out to be wrong or lossy, the original is still there.
+ * A checkpoint is an additional artifact. The canonical transcript is not
+ * rewritten, shortened or marked superseded — if the summary turns out lossy
+ * or wrong, the original is still there to go back to, which is the whole
+ * claim invariant 16 makes.
+ *
+ * The v0.1 checkpoint is derived structurally from the event log rather than
+ * written by a model. It is therefore exact but shallow: it records what
+ * happened, not what it meant. A model-written summary can be layered on later
+ * without changing this contract, and keeping the deterministic one underneath
+ * means a bad summary never becomes the only record.
  */
 
 export interface Checkpoint {
   sessionId: SessionId;
-  /** Event seq this checkpoint summarises up to, exclusive. */
+  /** Event seq this checkpoint summarises up to, inclusive. */
   throughSeq: number;
   goal: string;
   decisions: string[];
@@ -36,18 +43,81 @@ export const NEVER_COMPRESS: readonly string[] = [
   "permission_state",
 ];
 
-/** Writes a new checkpoint artifact. Does not touch the transcript. */
-export function writeCheckpoint(
-  _sessionId: SessionId,
-  _throughSeq: number,
+/**
+ * Build and persist a checkpoint. Reads the transcript; never writes to it.
+ */
+export async function writeCheckpoint(
+  store: SessionStore,
+  sessionId: SessionId,
+  throughSeq: number,
 ): Promise<Checkpoint> {
-  throw new NotImplemented("writeCheckpoint", "RUN-005");
+  const events = (await store.events(sessionId)).filter((e) => e.seq <= throughSeq);
+  const checkpoint = summarise(sessionId, throughSeq, events);
+  await store.saveCheckpoint(checkpoint);
+  return checkpoint;
 }
 
-/** Working context = checkpoint + recent turns + retrieved evidence. */
-export function buildWorkingContext(
-  _checkpoint: Checkpoint,
-  _recentTurnCount: number,
+function summarise(
+  sessionId: SessionId,
+  throughSeq: number,
+  events: readonly SessionEvent[],
+): Checkpoint {
+  const filesChanged = new Set<string>();
+  const completed: string[] = [];
+  const errors: string[] = [];
+
+  for (const event of events) {
+    if (event.type === "tool.finished") {
+      if (event.ok) completed.push(event.tool);
+      else errors.push(`${event.tool} failed`);
+      if (event.artifactId) filesChanged.add(event.artifactId);
+    }
+    if (event.type === "session.completed" && event.status === "error") {
+      errors.push("session ended in error");
+    }
+    if (event.type === "session.cancelled") errors.push(`cancelled: ${event.reason}`);
+  }
+
+  const firstMessage = events.find((e) => e.type === "message.received");
+
+  return {
+    sessionId,
+    throughSeq,
+    // The transcript holds the text; the checkpoint holds a reference to it,
+    // so a secret redacted in one place is not re-exposed in the other.
+    goal: firstMessage ? `message ${firstMessage.contentHash}` : "",
+    decisions: [],
+    filesChanged: [...filesChanged],
+    completed,
+    pending: [],
+    errors,
+    constraints: [],
+    evidenceRefs: [],
+    memoryRefs: [],
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Working context = checkpoint + recent turns. The checkpoint stands in for
+ * everything before `throughSeq`; the recent turns are passed through intact
+ * because that is where the detail the model still needs actually lives.
+ */
+export async function buildWorkingContext(
+  store: SessionStore,
+  checkpoint: Checkpoint,
+  recentTurnCount: number,
 ): Promise<string> {
-  throw new NotImplemented("buildWorkingContext", "RUN-005");
+  const all = await store.events(checkpoint.sessionId, checkpoint.throughSeq);
+  const recent = all.slice(-recentTurnCount);
+
+  return [
+    `## checkpoint through seq ${checkpoint.throughSeq}`,
+    `goal: ${checkpoint.goal}`,
+    `completed: ${checkpoint.completed.join(", ") || "none"}`,
+    `errors: ${checkpoint.errors.join(", ") || "none"}`,
+    ``,
+    `## recent`,
+    ...recent.map((e) => `[${e.seq}] ${e.type}`),
+  ].join("\n");
 }

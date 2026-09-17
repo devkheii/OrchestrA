@@ -5,7 +5,9 @@ A local-first, auditable AI agent harness. The repository is `OrchestrA`; the ha
 > Closed/verifiable tasks: seek verified consensus.
 > Open tasks: surface meaningful divergence.
 
-**Status: Phase 0.** The contract is written and the invariant tests are red. No feature module has a body yet — that is the intended state, not an unfinished one.
+**Status: Phase 1.** All sixteen v0.1 invariants are green — authenticated daemon, path guard, permission broker, secret isolation, egress policy, audit and replay, cancellation, budgets, conflict detection, compaction. `dem run "hello"` completes end to end against a fake provider.
+
+Still owed before v0.1 is done: a real OpenAI-compatible provider, scoped memory, and the long-lived PTY. The permission ceiling is `ASK` and stays there until a sandbox adapter lands in v0.2 (SPEC §19.1).
 
 ## Documents
 
