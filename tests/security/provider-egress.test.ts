@@ -77,6 +77,32 @@ describe("SEC-006: a non-loopback provider requires explicit consent", () => {
     expect(selection.provider.id).toContain("claude-cli");
   });
 
+  it("refuses the Anthropic provider without a key, and says what it costs", () => {
+    // The two Claude adapters look interchangeable from outside and are not:
+    // one draws on a subscription window, this one bills per request.
+    try {
+      resolveProvider({ DEM_PROVIDER: "anthropic" });
+      expect.unreachable("should have thrown");
+    } catch (err) {
+      expect((err as Error).message).toContain("bills per request");
+    }
+  });
+
+  it("treats the Anthropic API as remote, since it is", () => {
+    expect(() =>
+      resolveProvider({ DEM_PROVIDER: "anthropic", DEM_API_KEY: "sk-x" }),
+    ).toThrow(PolicyViolation);
+
+    const selection = resolveProvider({
+      DEM_PROVIDER: "anthropic",
+      DEM_API_KEY: "sk-x",
+      DEM_ALLOW_REMOTE: "1",
+    });
+    expect(selection.local).toBe(false);
+    expect(selection.provider.id).toContain("anthropic");
+    expect(selection.provider.id).not.toContain("sk-x");
+  });
+
   it("never puts the API key in the label or provider id", () => {
     const selection = resolveProvider({
       DEM_BASE_URL: "http://127.0.0.1:8080",

@@ -11,6 +11,14 @@ export interface ModelMessage {
   content: string;
   /** Set on a tool result, linking it to the call it answers. */
   toolCallId?: string;
+  /** Set on an assistant turn that requested tools. */
+  toolCalls?: readonly ToolCall[];
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
 }
 
 export interface ModelRequest {
@@ -40,12 +48,6 @@ export interface ToolDefinition {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
-}
-
-export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
 }
 
 export interface RunContext {

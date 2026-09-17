@@ -1,6 +1,11 @@
 import { PolicyViolation } from "@dem/protocol";
 import type { Provider } from "@dem/protocol";
-import { ClaudeCliProvider, FakeProvider, OpenAICompatibleProvider } from "@dem/adapters";
+import {
+  AnthropicProvider,
+  ClaudeCliProvider,
+  FakeProvider,
+  OpenAICompatibleProvider,
+} from "@dem/adapters";
 
 /**
  * Choosing the provider a daemon runs with.
@@ -23,13 +28,32 @@ export interface ProviderEnv {
   DEM_BASE_URL?: string | undefined;
   DEM_MODEL?: string | undefined;
   DEM_API_KEY?: string | undefined;
-  /** "claude-cli" to drive the locally installed Claude Code binary. */
+  /** "claude-cli", "anthropic", or unset for an OpenAI-compatible endpoint. */
   DEM_PROVIDER?: string | undefined;
+  /** Read when DEM_API_KEY is unset, matching the SDK convention. */
+  ANTHROPIC_API_KEY?: string | undefined;
   /** Must be "1" to permit anything that sends context off this machine. */
   DEM_ALLOW_REMOTE?: string | undefined;
 }
 
 export function resolveProvider(env: ProviderEnv): ProviderSelection {
+  if (env.DEM_PROVIDER === "anthropic") {
+    const key = env.DEM_API_KEY ?? env.ANTHROPIC_API_KEY;
+    if (!key) {
+      throw new PolicyViolation(
+        "DEM_PROVIDER=anthropic needs an API key in DEM_API_KEY or ANTHROPIC_API_KEY. " +
+          "Unlike the Claude CLI, which draws on a subscription's rate-limit window, " +
+          "this provider bills per request.",
+        1,
+      );
+    }
+    return gate(
+      new AnthropicProvider({ apiKey: key, ...(env.DEM_MODEL ? { model: env.DEM_MODEL } : {}) }),
+      env,
+      "the Anthropic API is not on this machine, and bills per request",
+    );
+  }
+
   if (env.DEM_PROVIDER === "claude-cli") {
     return gate(
       new ClaudeCliProvider(env.DEM_MODEL ? { model: env.DEM_MODEL } : {}),

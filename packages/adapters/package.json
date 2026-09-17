@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@dem/protocol": "workspace:*",
-    "@dem/engine": "workspace:*"
+    "@dem/engine": "workspace:*",
+    "@anthropic-ai/sdk": "^0.126.0"
   }
 }

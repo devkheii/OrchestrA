@@ -173,6 +173,7 @@ async function executeAndRecord(
     at: now(),
     tool: call.name,
     argsHash: hash(JSON.stringify(call.arguments)),
+    call,
   });
 
   const result = await runToolCall(registry, call, { ...policy, approved });
@@ -255,19 +256,34 @@ function conversationFrom(events: readonly SessionEvent[]): ModelMessage[] {
   const messages: ModelMessage[] = [];
   let assistant = "";
 
-  const flush = () => {
-    if (assistant) messages.push({ role: "assistant", content: assistant });
+  // Calls seen since the last assistant turn was flushed. An assistant turn
+  // has to carry the tool_use blocks its tool results answer: Anthropic
+  // rejects a tool_result with no matching call, and a projection that drops
+  // them cannot rebuild the conversation at all.
+  let pendingCalls: ToolCall[] = [];
+
+  const flushWith = () => {
+    if (assistant || pendingCalls.length > 0) {
+      messages.push({
+        role: "assistant",
+        content: assistant,
+        ...(pendingCalls.length > 0 ? { toolCalls: pendingCalls } : {}),
+      });
+    }
     assistant = "";
+    pendingCalls = [];
   };
 
   for (const event of events) {
     if (event.type === "message.received") {
-      flush();
+      flushWith();
       messages.push({ role: "user", content: event.content ?? "" });
     } else if (event.type === "answer.delta") {
       assistant += event.text;
+    } else if (event.type === "tool.requested") {
+      if (event.call) pendingCalls.push(event.call);
     } else if (event.type === "tool.finished") {
-      flush();
+      flushWith();
       messages.push({
         role: "tool",
         content: event.result ?? "",
@@ -275,7 +291,7 @@ function conversationFrom(events: readonly SessionEvent[]): ModelMessage[] {
       });
     }
   }
-  flush();
+  flushWith();
   return messages;
 }
 

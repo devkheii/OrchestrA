@@ -43,7 +43,10 @@ export type SessionEvent =
   // Persisted, so the display path and the audit record cannot diverge
   // (SPEC 15.1). Shown labelled, never merged into the answer.
   | (EventBase<"answer.rationale"> & { text: string })
-  | (EventBase<"tool.requested"> & { tool: string; argsHash: string })
+  // The call itself, not only its hash. Anthropic requires the assistant turn
+  // to carry the tool_use block that a tool_result answers, and a log that
+  // cannot reconstruct that cannot rebuild the conversation at all.
+  | (EventBase<"tool.requested"> & { tool: string; argsHash: string; call?: ToolCall })
   | (EventBase<"tool.started"> & { tool: string })
   | (EventBase<"tool.finished"> & {
       tool: string;

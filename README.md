@@ -13,13 +13,16 @@ A local-first, auditable AI agent harness. The repository is `OrchestrA`; the ha
 # A local OpenAI-compatible server (llama.cpp, a gateway)
 DEM_BASE_URL=http://127.0.0.1:8080 DEM_MODEL=qwen pnpm run dem run "..."
 
-# Or the Claude Code CLI, reusing credentials you already have
+# The Claude Code CLI, reusing credentials you already have (no tool calling)
 DEM_PROVIDER=claude-cli DEM_MODEL=sonnet DEM_ALLOW_REMOTE=1 pnpm run dem run "..."
+
+# The Anthropic API directly (bills per request; supports tool calling)
+DEM_PROVIDER=anthropic ANTHROPIC_API_KEY=sk-... DEM_ALLOW_REMOTE=1 pnpm run dem run "..."
 ```
 
 Anything that sends context off the machine is refused unless `DEM_ALLOW_REMOTE=1`, and `dem models` states `LOCAL` or `REMOTE` before listing anything. The Claude CLI counts as remote even though the binary is local: the gate follows the data, not the executable.
 
-Under a Claude subscription the CLI is not billed per request — it draws on the account's rate-limit window, which is the same one you use for your own work. The harness's tests never call it for that reason.
+The two Claude adapters look interchangeable and are not. Under a subscription the CLI is not billed per request — it draws on the account's rate-limit window, the same one you use for your own work — but it cannot call tools, because its own tools are stripped to keep them out of our permission broker. The  provider bills per request and does support tool calling. The harness's tests call neither.
 
 The permission ceiling is `ASK` and stays there until a sandbox adapter lands in v0.2 (SPEC §19.1).
 
