@@ -22,7 +22,14 @@ DEM_PROVIDER=anthropic ANTHROPIC_API_KEY=sk-... DEM_ALLOW_REMOTE=1 pnpm run dem 
 
 Anything that sends context off the machine is refused unless `DEM_ALLOW_REMOTE=1`, and `dem models` states `LOCAL` or `REMOTE` before listing anything. The Claude CLI counts as remote even though the binary is local: the gate follows the data, not the executable.
 
-The two Claude adapters look interchangeable and are not. Under a subscription the CLI is not billed per request — it draws on the account's rate-limit window, the same one you use for your own work — but it cannot call tools, because its own tools are stripped to keep them out of our permission broker. The  provider bills per request and does support tool calling. The harness's tests call neither.
+The two Claude adapters look interchangeable and are not:
+
+| | Billing | Tool calling |
+|---|---|---|
+| `claude-cli` | Draws on your subscription's rate-limit window — the same one you use for your own work | **No.** Its own tools are stripped to keep them out of our permission broker |
+| `anthropic` | Bills per request against an API key | Yes |
+
+The harness's tests call neither. For work a model should do end to end, delegate instead — see below.
 
 The permission ceiling is `ASK` and stays there until a sandbox adapter lands in v0.2 (SPEC §19.1).
 
