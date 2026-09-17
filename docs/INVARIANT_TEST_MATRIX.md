@@ -23,17 +23,17 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 
 | # | Invariant (abbreviated) | Test IDs | Module | Status |
 |---|---|---|---|---|
-| 1 | Local is the default execution/privacy mode | `SEC-006` | policy, adapters | todo (v0.1) |
-| 2 | File read never implies remote egress | `SEC-006` | policy, permissions | todo (v0.1) |
+| 1 | Local is the default execution/privacy mode | `SEC-006` | policy, adapters | green |
+| 2 | File read never implies remote egress | `SEC-006` | policy, permissions | green |
 | 3 | Permission and sandbox are independent layers | `SEC-008`, `SEC-010` | permissions, runtime | deferred (v0.2-alpha) — sandbox adapter lands with the counterexample runner |
 | 4 | Every endpoint authenticated (except minimal `/healthz`) | `SEC-001` | daemon | green |
 | 5 | Host/Origin validation, CORS deny-by-default | `SEC-002` | daemon | green |
 | 6 | Secrets never in context/memory/audit/child env/UI | `SEC-005`, `SEC-015` | secrets, audit, context | todo (v0.1) |
 | 7 | Child processes get a sanitized environment | `SEC-005` | runtime, permissions | todo (v0.1) |
-| 8 | Path access checked by canonical/real path | `SEC-003`, `SEC-004` | policy, tools | todo (v0.1) |
+| 8 | Path access checked by canonical/real path | `SEC-003`, `SEC-004` | policy, tools | green |
 | 9 | Untrusted content cannot become instruction | `SEC-016` | context | todo (v0.1) |
 | 10 | Tainted run receives stricter AUTO | `SEC-007` | context, permissions | deferred (v0.2-alpha) — AUTO does not exist in v0.1 (SPEC §19.1) |
-| 21 | No unsafe sandbox fallback | `SEC-008` | permissions, runtime | todo (v0.1) — v0.1 asserts AUTO is unselectable with no sandbox |
+| 21 | No unsafe sandbox fallback | `SEC-008` | permissions, runtime | green — v0.1 asserts AUTO is unselectable with no sandbox |
 | 29 | Security config composes monotonically | `SEC-013` | policy | todo (v0.1) |
 | 31 | Model-authored code runs only in a healthy sandbox, never against the live workspace | `SEC-009`, `SEC-010`, `SEC-011`, `SEC-012` | counterexample, runtime | deferred (v0.2-alpha) |
 

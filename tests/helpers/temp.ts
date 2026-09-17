@@ -13,18 +13,25 @@ export async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T
 }
 
 /**
- * A workspace with a file inside it, a file outside it, and a symlink from
- * inside pointing out — the three shapes the path guard has to distinguish.
+ * A workspace with a file inside it, a file outside it, and at least one link
+ * from inside that resolves out — the shapes the path guard has to tell apart.
+ *
+ * Two link kinds are attempted because Windows treats them differently:
+ * a file symlink needs Developer Mode or elevation, while a *directory
+ * junction* needs neither. The junction is not a fallback for test
+ * convenience — it is the escape an unprivileged process on Windows can
+ * actually create, so it is the one that most needs covering there.
  */
 export interface EscapeFixture {
   root: string;
   workspace: string;
   insideFile: string;
   outsideFile: string;
-  /** Path inside the workspace that resolves outside it. */
-  symlinkedEscape: string;
-  /** True when the OS let us create the symlink (Windows may not). */
-  symlinkCreated: boolean;
+  /**
+   * Paths inside the workspace that resolve outside it. At least one entry,
+   * or the fixture throws rather than letting the suite pass untested.
+   */
+  escapes: Array<{ kind: "symlink" | "junction"; path: string }>;
 }
 
 export async function makeEscapeFixture(root: string): Promise<EscapeFixture> {
@@ -38,15 +45,30 @@ export async function makeEscapeFixture(root: string): Promise<EscapeFixture> {
   await writeFile(insideFile, "in\n");
   await writeFile(outsideFile, "out\n");
 
-  const symlinkedEscape = join(workspace, "escape.txt");
-  let symlinkCreated = false;
+  const escapes: EscapeFixture["escapes"] = [];
+
   try {
-    await symlink(outsideFile, symlinkedEscape, "file");
-    symlinkCreated = true;
+    const link = join(workspace, "escape.txt");
+    await symlink(outsideFile, link, "file");
+    escapes.push({ kind: "symlink", path: "escape.txt" });
   } catch {
-    // Unprivileged Windows without Developer Mode cannot create symlinks.
-    // The traversal assertions still run; the symlink case is skipped.
+    // Unprivileged Windows without Developer Mode. The junction below covers it.
   }
 
-  return { root, workspace, insideFile, outsideFile, symlinkedEscape, symlinkCreated };
+  try {
+    const link = join(workspace, "escape-dir");
+    await symlink(outside, link, "junction");
+    escapes.push({ kind: "junction", path: "escape-dir/secret.txt" });
+  } catch {
+    // POSIX has no junctions; the symlink above covers it there.
+  }
+
+  if (escapes.length === 0) {
+    throw new Error(
+      "no link escape could be created on this host, so SEC-004 would pass untested. " +
+        "Run the suite under WSL2, or enable Developer Mode on Windows.",
+    );
+  }
+
+  return { root, workspace, insideFile, outsideFile, escapes };
 }

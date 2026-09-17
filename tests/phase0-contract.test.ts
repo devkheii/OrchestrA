@@ -16,20 +16,12 @@ import * as daemon from "@dem/daemon";
 type Stub = { name: string; call: () => unknown };
 
 const STUBS: Stub[] = [
-  { name: "resolveWorkspacePath", call: () => engine.resolveWorkspacePath("/w", "a") },
-  { name: "isProtectedPath", call: () => engine.isProtectedPath(".env") },
   { name: "mergeSettings", call: () => engine.mergeSettings([]) },
   { name: "composeSecurity", call: () => engine.composeSecurity([]) },
   { name: "assertWithinBudget", call: () => engine.assertWithinBudget({}, {
     inputTokens: 0, outputTokens: 0, wallTimeMs: 0, remoteCost: 0, rounds: 0,
     counterexampleExecutions: 0,
   }, {}) },
-  { name: "assertEgressApproved", call: () => engine.assertEgressApproved({ provider: "p", blocks: [] }, []) },
-  { name: "selectableModes", call: () => engine.selectableModes("UNAVAILABLE") },
-  { name: "decide", call: () => engine.decide({
-    action: "read", mode: "ASK", taint: "CLEAN", sandbox: "UNAVAILABLE", subject: "x",
-  }) },
-  { name: "segmentCommand", call: () => engine.segmentCommand("a && b") },
   { name: "sanitizeChildEnv", call: () => engine.sanitizeChildEnv({}) },
   { name: "redact", call: () => engine.redact("t", []) },
   { name: "assemblePrompt", call: () => engine.assemblePrompt([]) },
@@ -54,6 +46,8 @@ const STUBS: Stub[] = [
  *
  *   Phase 1 step 2 — authenticated daemon      (SEC-001, SEC-002)
  *   Phase 1 step 3 — session/event persistence (RUN-004)
+ *   Phase 1 step 7 — path guard and egress       (SEC-003, SEC-004, SEC-006)
+ *   Phase 1 step 8 — permission broker           (SEC-008)
  *
  * The probe below calls each with valid but inert arguments: it checks the
  * wiring, not the behaviour. Behaviour belongs to the named suites.
@@ -64,6 +58,12 @@ const IMPLEMENTED: Stub[] = [
   { name: "tokenFilePath", call: () => daemon.tokenFilePath("/tmp") },
   { name: "startDaemon", call: () => typeof daemon.startDaemon },
   { name: "openSessionStore", call: () => engine.openSessionStore(":memory:") },
+  { name: "resolveWorkspacePath", call: () => engine.resolveWorkspacePath(process.cwd(), ".") },
+  { name: "isProtectedPath", call: () => engine.isProtectedPath("src/a.ts") },
+  { name: "assertEgressApproved", call: () => engine.assertEgressApproved({ provider: "p", blocks: [] }, []) },
+  { name: "selectableModes", call: () => engine.selectableModes("UNAVAILABLE") },
+  { name: "segmentCommand", call: () => engine.segmentCommand("a") },
+  { name: "decide", call: () => engine.decide({ action: "read", mode: "ASK", taint: "CLEAN", sandbox: "UNAVAILABLE", subject: "x" }) },
 ];
 
 /** Test IDs declared in docs/SPEC.md section 31. */
