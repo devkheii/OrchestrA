@@ -7,7 +7,7 @@ coverage/
 .env.*
 !.env.example
 /tmp/
-docs/efficacy/*-results.md
 
-# Design documents are kept local, not published.
-docs/
+# Superseded drafts. The current SPEC and plan are published; these are not,
+# so nobody implements against a revision whose defects were already fixed.
+docs/archive/
