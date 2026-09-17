@@ -36,6 +36,8 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 21 | No unsafe sandbox fallback | `SEC-008` | permissions, runtime | green — v0.1 asserts AUTO is unselectable with no sandbox |
 | 29 | Security config composes monotonically | `SEC-013` | policy | green |
 | 33 | Memory scopes do not leak across workspaces | `SEC-017` | memory | green |
+| 34 | External-agent delegation is bounded and recorded as suspended guarantees | `SEC-018` | adapters, session | deferred (v0.3) — ExternalAgentAdapter is not built yet |
+| 35 | Reasoning is a public rationale or it is not kept | `SEC-019` | adapters, audit | green |
 | 31 | Model-authored code runs only in a healthy sandbox, never against the live workspace | `SEC-009`, `SEC-010`, `SEC-011`, `SEC-012` | counterexample, runtime | deferred (v0.2-alpha) |
 
 Note on #21: the invariant is testable in v0.1 even though the sandbox adapter is absent. The v0.1 assertion is the negative one — with no sandbox present, AUTO and FULL_ACCESS must be unselectable. The positive case (healthy sandbox enables AUTO) is added in v0.2-alpha.
@@ -94,13 +96,13 @@ Additional orchestrator tests required by SPEC §31: `ORCH-001` (OBSERVE does no
 
 | Release | Invariants that must be `green` |
 |---|---|
-| v0.1 | 1, 2, 4, 5, 6, 7, 8, 9, 16, 17, 20, 21, 26, 27, 28, 29, 33 |
+| v0.1 | 1, 2, 4, 5, 6, 7, 8, 9, 16, 17, 20, 21, 26, 27, 28, 29, 33, 35 |
 | v0.2-alpha | + 3, 10, 11, 12, 13, 14, 15, 31 |
 | v0.2-beta | + 18, 22, 23, 30, 32 |
-| v0.3 | + 24 |
+| v0.3 | + 24, 34 |
 | v0.3.1 | + 19 |
 | v0.4 | + 25 |
-| 1.0 | all 33, plus the efficacy gate of SPEC §28 |
+| 1.0 | all 35, plus the efficacy gate of SPEC §28 |
 
 ---
 

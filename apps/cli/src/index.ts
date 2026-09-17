@@ -118,6 +118,22 @@ async function runOnce(daemon: DaemonHandle, prompt: string, io: Io): Promise<nu
   });
   const { events: log } = (await events.json()) as { events: SessionEvent[] };
 
+  // Rationale goes to stderr, dimmed and prefixed. Visible while working, but
+  // never mixed into the answer a pipe or a script consumes — the separation
+  // the event stream keeps is only worth having if the display keeps it too.
+  const rationale = log
+    .filter((e) => e.type === "answer.rationale")
+    .map((e) => e.text)
+    .join("");
+
+  if (rationale) {
+    io.err("[2m┌ reasoning[0m\n");
+    for (const line of rationale.split("\n")) {
+      io.err(`[2m│ ${line}[0m\n`);
+    }
+    io.err("[2m└[0m\n\n");
+  }
+
   for (const event of log) {
     if (event.type === "answer.delta") io.out(event.text);
   }

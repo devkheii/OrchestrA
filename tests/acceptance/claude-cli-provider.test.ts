@@ -68,10 +68,18 @@ describe("Claude CLI provider: streaming", () => {
     expect(events.at(-1)).toEqual({ type: "done", reason: "stop" });
   });
 
-  it("never emits the reasoning channel as answer text", async () => {
+  it("keeps thinking out of the answer, surfacing it as rationale", async () => {
+    // The real CLI emits no thinking frames today — probing found none, and no
+    // flag produces them. The handling exists because the frame shape is the
+    // provider's to decide, and this asserts it lands on the rationale channel
+    // rather than in the answer if it ever does (SPEC §15.1).
     const events = await collect(fakeProvider().run(ask("SCENARIO_THINKING")));
+
     expect(textOf(events)).toBe("visible answer");
-    expect(JSON.stringify(events)).not.toContain("SECRET_REASONING");
+    expect(textOf(events)).not.toContain("SECRET_REASONING");
+
+    const rationale = events.filter((e) => e.type === "rationale").map((e) => e.text).join("");
+    expect(rationale).toBe("SECRET_REASONING");
   });
 
   it("reports a truncated answer as length, not a clean stop", async () => {

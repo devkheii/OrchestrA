@@ -95,8 +95,11 @@ describe("OpenAI-compatible provider: streaming", () => {
   });
 });
 
-describe("OpenAI-compatible provider: invariant 17 at the boundary", () => {
-  it("never emits the reasoning channel as answer text", async () => {
+describe("OpenAI-compatible provider: invariants 17 and 35 at the boundary", () => {
+  it("keeps the reasoning channel out of the answer, as its own event", async () => {
+    // Not dropped — a summary the model wrote to be read is a public rationale
+    // (SPEC §15.1). What must never happen is the two arriving as one string,
+    // after which they cannot be told apart. SEC-019 covers this in full.
     const server = await startFakeOpenAI({
       frames: [
         { choices: [{ delta: { reasoning_content: "the user probably means..." } }] },
@@ -107,11 +110,14 @@ describe("OpenAI-compatible provider: invariant 17 at the boundary", () => {
     try {
       const provider = new OpenAICompatibleProvider({ baseUrl: server.url, model: "test" });
       const events = await collect(provider.run(REQUEST));
-      const text = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
 
-      expect(text).toBe("42");
-      expect(JSON.stringify(events)).not.toContain("probably means");
-      expect(JSON.stringify(events)).not.toContain("6x7");
+      const answer = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
+      const rationale = events.filter((e) => e.type === "rationale").map((e) => e.text).join("");
+
+      expect(answer).toBe("42");
+      expect(answer).not.toContain("probably means");
+      expect(answer).not.toContain("6x7");
+      expect(rationale).toContain("probably means");
     } finally {
       await server.close();
     }

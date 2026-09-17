@@ -29,9 +29,16 @@ export interface OpenAICompatibleConfig {
 }
 
 /**
- * Fields carrying the model's hidden reasoning. Dropped here, at the edge,
- * because once this text is mixed into an answer it cannot be told apart from
- * one (invariant 17).
+ * Fields carrying a model-authored summary of its reasoning.
+ *
+ * Reasoning-capable local models (Qwen, DeepSeek and the like, served through
+ * an OpenAI-compatible endpoint) put a summary here. It is surfaced as a
+ * `rationale` event — labelled, never merged into the answer — because a
+ * summary the model wrote to be read is a public rationale, not the hidden
+ * chain-of-thought invariant 17 forbids keeping (SPEC §15.1).
+ *
+ * The separation is what makes that true. Concatenated into the answer, it
+ * would be indistinguishable from one, and would have to be dropped.
  */
 const REASONING_KEYS = [
   "reasoning",
@@ -129,6 +136,11 @@ export class OpenAICompatibleProvider implements Provider {
         const choice = frame.choices?.[0];
         if (!choice) continue;
 
+        // Rationale first, so a consumer rendering in order shows the model's
+        // reasoning before the conclusion it led to.
+        const rationale = rationaleOf(choice.delta);
+        if (rationale) yield { type: "rationale", text: rationale };
+
         const text = contentOf(choice.delta);
         if (text) yield { type: "delta", text };
 
@@ -161,18 +173,21 @@ interface ChatFrame {
   }>;
 }
 
-/**
- * Answer text only. A reasoning field is not concatenated into the answer,
- * and not carried alongside it either — there is no downstream consumer for
- * it that would not eventually persist it.
- */
+/** Answer text only. Reasoning fields are read by `rationaleOf`, never here. */
 function contentOf(delta: Record<string, unknown> | undefined): string {
   if (!delta) return "";
-  for (const key of REASONING_KEYS) {
-    if (key in delta) delete delta[key];
-  }
   const content = delta["content"];
   return typeof content === "string" ? content : "";
+}
+
+/** The model's own summary of its reasoning, if this endpoint returns one. */
+function rationaleOf(delta: Record<string, unknown> | undefined): string {
+  if (!delta) return "";
+  for (const key of REASONING_KEYS) {
+    const value = delta[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return "";
 }
 
 /** Parse an SSE body into `data:` payloads. */

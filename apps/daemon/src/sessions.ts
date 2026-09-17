@@ -68,7 +68,16 @@ export async function runMessage(
       { messages: [{ role: "user", content }] },
       { signal },
     )) {
-      if (event.type === "delta") {
+      if (event.type === "rationale") {
+        // Persisted like any other event, so what the user is shown and what the
+        // record contains cannot drift apart (SPEC 15.1).
+        await store.append(id, {
+          type: "answer.rationale",
+          sessionId: id,
+          at: now(),
+          text: event.text,
+        });
+      } else if (event.type === "delta") {
         await store.append(id, {
           type: "answer.delta",
           sessionId: id,

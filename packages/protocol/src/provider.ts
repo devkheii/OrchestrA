@@ -17,8 +17,16 @@ export interface ModelRequest {
   maxOutputTokens?: number;
 }
 
+/**
+ * A model-authored summary of its own reasoning, kept apart from the answer.
+ *
+ * Separate by construction, not by convention: once rationale is concatenated
+ * into answer text there is no way to tell them apart afterwards, and from that
+ * point it has to be treated as a raw reasoning channel (invariant 35).
+ */
 export type ModelEvent =
   | { type: "delta"; text: string }
+  | { type: "rationale"; text: string }
   | { type: "done"; reason: "stop" | "length" | "cancelled" }
   | { type: "error"; message: string };
 

@@ -15,6 +15,21 @@ import type {
  * already authenticated with — which makes it the easiest real model to point
  * this harness at.
  *
+ * **This is an agent wearing a provider's clothes, and that is a compromise.**
+ * SPEC §4.1 separates the two: a Provider answers a prompt while the harness
+ * keeps context, tools, permission and audit; an external agent is handed the
+ * task and brings its own. The CLI is the second kind. It is used here as the
+ * first by stripping all 31 of its tools, which works and is honest, but costs
+ * something real: a process spawn and CLI start-up per call, CLAUDE.md and
+ * skill loading we never use, and agent-grade quota spent on text-generator
+ * output. For the Provider role a native API adapter is the better fit; the
+ * CLI's proper home is `external-agent/`, once the delegation boundary of
+ * §4.2 exists to receive it (invariant 34, v0.3).
+ *
+ * `--bare` would remove most of that overhead, and is deliberately not used:
+ * it forces API-key authentication and never reads OAuth or the keychain,
+ * which would turn a subscription call into a billed one.
+ *
  * Three constraints shape the implementation, and each of them is an invariant
  * rather than a preference:
  *
@@ -206,11 +221,22 @@ export class ClaudeCliProvider implements Provider {
           }
         }
 
-        // Token-level deltas. `thinking_delta` is deliberately not handled:
-        // reasoning is dropped at the boundary, where it can still be told
-        // apart from the answer (invariant 17).
         if (frame.type === "stream_event" && frame.event?.type === "content_block_delta") {
           const delta = frame.event.delta;
+
+          // A summary the model wrote to be read is a public rationale, so it
+          // is surfaced labelled and separate rather than dropped (SPEC 15.1).
+          //
+          // In practice this branch does not fire today: probing the CLI found
+          // no thinking frames and no flag that would produce them, so the
+          // reasoning it shows interactively is not on this interface. The
+          // handling is here because the shape is the provider's to decide, not
+          // ours to assume, and an empty rationale is the honest answer for a
+          // provider that supplies none.
+          if (delta?.type === "thinking_delta" && delta.thinking) {
+            yield { type: "rationale", text: delta.thinking };
+          }
+
           if (delta?.type === "text_delta" && delta.text) {
             sawText = true;
             yield { type: "delta", text: delta.text };
@@ -277,7 +303,7 @@ interface CliFrame {
   total_cost_usd?: number;
   event?: {
     type?: string;
-    delta?: { type?: string; text?: string };
+    delta?: { type?: string; text?: string; thinking?: string };
   };
 }
 

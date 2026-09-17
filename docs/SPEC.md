@@ -78,6 +78,8 @@ The core differentiation is:
 31. **Model-authored code — including counterexamples — is never executed outside a healthy sandbox, and never against the live workspace.** If sandbox health is insufficient, execution does not occur and the objection cannot reach `VALIDATED` by execution.
 32. **A `DIVERGENT` or `ABSTAIN` result never silently continues an agentic run.** Interactive runs pause for user arbitration; non-interactive runs terminate without further workspace mutation or remote spend.
 33. **Memory scopes do not leak.** A workspace only ever retrieves its own workspace memory; session and agent memory stay within their session and agent; global memory is shared by design and is written conservatively. One project's notes never surface while working on another.
+34. **Delegation to an external agent is bounded and recorded as a suspension of guarantees.** The agent never runs against the live workspace, its output re-enters through the harness's own patch path, its logs are imported as an opaque artifact rather than presented as our event trail, and the decision record states that guarantees were suspended (§4.2).
+35. **A model's reasoning is either a public rationale or it is not kept.** A model-authored summary may be stored and shown, separately from the answer and labelled as rationale. A raw reasoning channel is dropped where it arrives, and is never concatenated into the answer — once mixed in, it cannot be told apart from one (§15.1).
 
 Every invariant maps to at least one automated test ID; see §32 and `docs/INVARIANT_TEST_MATRIX.md`.
 
@@ -135,6 +137,36 @@ external_agent.run
 ```
 
 Providers publish capabilities and runtime metadata. Core logic must not depend on specific model names.
+
+### 4.1 Providers and external agents are different things
+
+A **Provider** answers a prompt. The harness keeps everything around it: context assembly, memory, the tool surface, the permission broker, the audit trail, and — later — the council. Adding a model as a Provider extends what the harness can think with, and changes nothing about what it guarantees.
+
+An **external agent** (`external_agent.run` — Codex CLI, Claude Code, another harness) is handed the task itself. It brings its own loop, its own tools, and its own permission model.
+
+That difference is not a matter of packaging. **An external agent run is the one place where every invariant in §2 stops applying**, and the SPEC says so plainly rather than letting the discovery happen later:
+
+| Invariant | What delegation does to it |
+|---|---|
+| 7 — tool execution cannot bypass the permission broker | The agent runs its own shell and editor under its own rules |
+| 8 — path access checked by real path | It uses its own filesystem access |
+| 26 — conflict detection on every workspace edit | It writes without our expected-hash check |
+| 16, 17 — canonical transcript and public rationale | We receive a summary, not its tool events |
+| 31 — model-authored code runs only in a healthy sandbox | It executes code under its own policy |
+
+### 4.2 The delegation boundary (normative)
+
+Delegation is permitted, and is genuinely useful for large autonomous coding tasks. It is bounded as follows, so that what the harness promises stays true on both sides of the line:
+
+1. **Never the live workspace.** The agent runs against an isolated copy or worktree. Invariants 8 and 26 survive at the boundary because the agent never touches the tree they protect.
+2. **Results return as a diff and are re-applied by us.** The harness reviews and applies the agent's output through its own patch path, with expected-hash conflict detection and the permission broker. We do not bless writes the agent already made; we make the writes ourselves.
+3. **Its audit is imported as an opaque artifact.** The agent's own logs are attached to the decision as an artifact and are never presented as the harness's own event trail. The decision record states explicitly that guarantees were suspended, for how long, and to whom.
+4. **Explicit opt-in, like remote egress.** Codex CLI and Claude Code both send the entire context to a third party, so delegation passes the same gate as any other egress (§4.3) and is refused without consent.
+5. **A delegated result is never a verified result on its own.** It enters the decision engine as a candidate, subject to the same verifiers as any other (invariant 15).
+
+### 4.3 Egress follows the data, not the executable
+
+Whether a provider or agent sends context off the machine is a property of where the data goes, never of where the process runs. A locally installed binary that relays prompts to a hosted API is remote. Classifying by process location would let an entire workspace leave the machine while the interface reported `LOCAL`.
 
 ---
 
@@ -508,6 +540,22 @@ Audit stores:
 Audit uses append-oriented JSONL plus SQLite indexes.
 
 Audit must not contain hidden chain-of-thought or raw model scratchpads (invariant 17). Provider responses are filtered for reasoning-channel content before persistence.
+
+### 15.1 Summarized rationale is not hidden chain-of-thought
+
+Invariant 17 forbids keeping a model's hidden reasoning. It does not forbid keeping a rationale the model wrote to be read, and the two must not be conflated — §6 defines a `publicRationale` field precisely so there is somewhere for the second kind to live.
+
+The distinction is by kind, not by wording:
+
+- **Raw reasoning channel** — a provider's internal thinking stream. Dropped where it arrives. Not shown, not stored.
+- **Summarized rationale** — a model-authored summary, which several providers return in place of raw reasoning. May be shown and may be stored, under two conditions.
+
+The conditions are what keep the distinction meaningful:
+
+1. **It is a separate event, never concatenated into the answer.** Once rationale is merged into answer text there is no way to tell them apart afterwards, and from that point it has to be treated as raw reasoning.
+2. **Display and audit do not diverge.** Anything the user is shown is in the event log; anything in the event log can be shown. A harness that claims auditability cannot have a display path carrying content its record does not.
+
+Where a provider supplies no rationale — the Claude Code CLI exposes none through its interface, and several APIs default to omitting it — the harness shows nothing rather than inventing something. An empty rationale is an honest answer about that provider.
 
 ---
 
@@ -1052,7 +1100,9 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `SEC-014` audit records contain no reasoning-channel/scratchpad content;
 - `SEC-015` secret values are redacted from tool output, audit records, model context, and UI responses;
 - `SEC-016` instruction-shaped text inside file/web content does not become system or user instruction;
-- `SEC-017` memory written in one workspace is not retrievable from another.
+- `SEC-017` memory written in one workspace is not retrievable from another;
+- `SEC-018` a delegated external-agent run never touches the live workspace, and its result re-enters through the harness patch path;
+- `SEC-019` a raw reasoning channel is never stored or concatenated into the answer, while a summarized rationale is kept as a separate labelled event.
 
 **Decision**
 

@@ -13,6 +13,7 @@ export type SessionEventType =
   | "message.received"
   | "model.started"
   | "answer.delta"
+  | "answer.rationale"
   | "tool.requested"
   | "tool.started"
   | "tool.finished"
@@ -34,6 +35,9 @@ export type SessionEvent =
   | (EventBase<"message.received"> & { role: "user"; contentHash: string })
   | (EventBase<"model.started"> & { provider: string; model: string })
   | (EventBase<"answer.delta"> & { text: string })
+  // Persisted, so the display path and the audit record cannot diverge
+  // (SPEC 15.1). Shown labelled, never merged into the answer.
+  | (EventBase<"answer.rationale"> & { text: string })
   | (EventBase<"tool.requested"> & { tool: string; argsHash: string })
   | (EventBase<"tool.started"> & { tool: string })
   | (EventBase<"tool.finished"> & { tool: string; ok: boolean; artifactId?: string })
