@@ -63,6 +63,20 @@ describe("SEC-006: a non-loopback provider requires explicit consent", () => {
     expect(selection.label).toContain("REMOTE");
   });
 
+  it("refuses the local Claude CLI binary too, because its data still leaves", () => {
+    // The sharpest version of this mistake: the process is on this machine, so
+    // a URL-shaped check waves it through while it forwards the whole context
+    // to a third party.
+    expect(() => resolveProvider({ DEM_PROVIDER: "claude-cli" })).toThrow(PolicyViolation);
+  });
+
+  it("permits the Claude CLI once opted in, and labels it REMOTE", () => {
+    const selection = resolveProvider({ DEM_PROVIDER: "claude-cli", DEM_ALLOW_REMOTE: "1" });
+    expect(selection.local).toBe(false);
+    expect(selection.label).toContain("REMOTE");
+    expect(selection.provider.id).toContain("claude-cli");
+  });
+
   it("never puts the API key in the label or provider id", () => {
     const selection = resolveProvider({
       DEM_BASE_URL: "http://127.0.0.1:8080",

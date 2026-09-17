@@ -5,3 +5,5 @@
 export { FakeProvider } from "./fake-provider.js";
 export { OpenAICompatibleProvider } from "./openai-compatible.js";
 export type { OpenAICompatibleConfig } from "./openai-compatible.js";
+export { ClaudeCliProvider } from "./claude-cli.js";
+export type { ClaudeCliConfig } from "./claude-cli.js";
