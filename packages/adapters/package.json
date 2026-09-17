@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@dem/protocol": "workspace:*"
+    "@dem/protocol": "workspace:*",
+    "@dem/engine": "workspace:*"
   }
 }

@@ -8,3 +8,5 @@ export { OpenAICompatibleProvider } from "./openai-compatible.js";
 export type { OpenAICompatibleConfig } from "./openai-compatible.js";
 export { ClaudeCliProvider } from "./claude-cli.js";
 export type { ClaudeCliConfig } from "./claude-cli.js";
+export { ClaudeCodeAgent } from "./claude-code-agent.js";
+export type { ClaudeCodeAgentConfig } from "./claude-code-agent.js";

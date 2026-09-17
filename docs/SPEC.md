@@ -1014,6 +1014,23 @@ Required:
 
 Explicitly **not** in v0.1: sandbox adapter, AUTO mode, FULL_ACCESS, counterexample execution, council, Web.
 
+### v0.1.1 — Providers and delegation
+
+Pulled forward from v0.5, where the native adapters and the external-agent
+adapters sat on one line together.
+
+The reason is ordering, not appetite. The efficacy spike needs two real models
+to form a council, and today there is one usable provider that cannot call
+tools and no local model at all. Provider work is therefore a prerequisite for
+Checkpoint B rather than a detour around it, and doing it here keeps v0.2-alpha
+focused on the experiment it exists for.
+
+Required:
+
+- native Anthropic provider, via the official SDK, with tool calling;
+- Claude Code as an external agent under the delegation boundary of §4.2
+  (invariant 34), rather than as a provider with its tools stripped.
+
 ### v0.2-alpha — Minimal Democracy Efficacy Spike
 Required:
 
@@ -1077,7 +1094,7 @@ Add:
 
 - Desktop shell;
 - ONNX browser privacy/classification/embedding/rerank experiments;
-- broader remote providers/external agents.
+- broader remote providers and external agents beyond the two moved to v0.1.1.
 
 ### 1.0
 Only when security gates, correctness gates, replay/audit gates, and efficacy gates are satisfied/documented.

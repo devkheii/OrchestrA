@@ -15,3 +15,4 @@ export * from "./tools/registry.js";
 export * from "./tools/terminal.js";
 export * from "./runtime/kill.js";
 export * from "./memory/store.js";
+export * from "./delegation/delegate.js";

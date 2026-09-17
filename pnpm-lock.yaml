@@ -33,9 +33,15 @@ importers:
 
   apps/cli:
     dependencies:
+      '@dem/adapters':
+        specifier: workspace:*
+        version: link:../../packages/adapters
       '@dem/daemon':
         specifier: workspace:*
         version: link:../daemon
+      '@dem/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@dem/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -54,6 +60,9 @@ importers:
 
   packages/adapters:
     dependencies:
+      '@dem/engine':
+        specifier: workspace:*
+        version: link:../engine
       '@dem/protocol':
         specifier: workspace:*
         version: link:../protocol

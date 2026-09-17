@@ -23,6 +23,17 @@ Under a Claude subscription the CLI is not billed per request — it draws on th
 
 The permission ceiling is `ASK` and stays there until a sandbox adapter lands in v0.2 (SPEC §19.1).
 
+For work a model should do end to end, hand it over instead:
+
+```sh
+DEM_ALLOW_REMOTE=1 pnpm run dem delegate "fix the failing auth test"
+```
+
+The agent runs in a copy of the workspace with its own tools, and its changes
+come back as a proposal you approve before anything here is touched. While it
+runs, this harness guarantees nothing about what it does — the record says so
+(SPEC §4.2).
+
 ## Documents
 
 | File | Role |

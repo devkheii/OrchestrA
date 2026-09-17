@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@dem/protocol": "workspace:*",
-    "@dem/daemon": "workspace:*"
+    "@dem/daemon": "workspace:*",
+    "@dem/engine": "workspace:*",
+    "@dem/adapters": "workspace:*"
   }
 }

@@ -672,7 +672,13 @@ Generated media may be checked by independent vision models, but deterministic m
 
 `onnxruntime-web` for PII detection, secret detection, intent/task classification, embeddings, rerank, light vision classification. WASM fallback. Never a hard dependency for core operation.
 
-Plus: Desktop shell (Electron wrapper around daemon + existing Web UI), native Anthropic/OpenAI adapters, optional LiteLLM gateway, external Claude Code/Codex agent adapters.
+Plus: Desktop shell (Electron wrapper around daemon + existing Web UI), the native OpenAI adapter, optional LiteLLM gateway, and the Codex external-agent adapter.
+
+The native Anthropic provider and the Claude Code external agent moved to
+v0.1.1 (SPEC §30). Not because they grew more interesting, but because the
+efficacy spike needs two real models to form a council and there is currently
+one usable provider, unable to call tools. They are a prerequisite for
+Checkpoint B, not a detour around it.
 
 ---
 

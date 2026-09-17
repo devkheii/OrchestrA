@@ -1,6 +1,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { resolveProvider, startDaemon } from "@dem/daemon";
+import { applyDelegated, delegate } from "@dem/engine";
+import { ClaudeCodeAgent } from "@dem/adapters";
 import type { DaemonHandle, SessionEvent } from "@dem/protocol";
 
 /**
@@ -30,6 +32,7 @@ const HELP = `dem — local-first AI agent harness
 
 Usage:
   dem run <prompt>     run one prompt to completion and print the answer
+  dem delegate <task>  hand the whole task to an external agent (Claude Code)
   dem models           list providers this daemon can reach
   dem help             show this message
 
@@ -75,10 +78,86 @@ export async function main(argv: readonly string[], io: Io = consoleIo): Promise
         return 0;
       });
 
+    case "delegate": {
+      const task = rest.join(" ").trim();
+      if (!task) {
+        io.err("dem delegate: a task is required\n");
+        return 2;
+      }
+      return runDelegation(task, io);
+    }
+
     default:
       io.err(`dem: unknown command "${command}"\n\n${HELP}`);
       return 2;
   }
+}
+
+/**
+ * Hand the whole task to an external agent (SPEC §4.2).
+ *
+ * Two approvals, not one. The first is to let the agent run at all, since the
+ * task and every file it reads leave the machine and the harness stops
+ * guaranteeing anything while it works. The second is to apply what it wrote,
+ * with the file list in view. Collapsing them into one question would mean
+ * consenting to an unseen diff at the moment of deciding whether to start.
+ */
+async function runDelegation(task: string, io: Io): Promise<number> {
+  const agent = new ClaudeCodeAgent({ model: process.env["DEM_MODEL"] ?? "sonnet" });
+
+  if (!agent.isLocal() && process.env["DEM_ALLOW_REMOTE"] !== "1") {
+    io.err(
+      `dem: delegating to ${agent.id} sends the task and the files it reads to a third party, ` +
+        `and suspends this harness's guarantees while it runs. ` +
+        `Set DEM_ALLOW_REMOTE=1 to accept that.\n`,
+    );
+    return 1;
+  }
+
+  io.err(`[1mdelegating to ${agent.id}[0m\n`);
+  io.err("[2mruns in a copy of this workspace; nothing here changes until you approve[0m\n\n");
+
+  const outcome = await delegate(agent, { workspace: process.cwd(), task, approved: false });
+
+  io.err(`[2m${outcome.agentLog.slice(0, 2000)}[0m\n\n`);
+
+  if (!outcome.ok) {
+    io.err("the agent did not finish successfully; nothing applied\n");
+    return 1;
+  }
+  if (outcome.changes.length === 0) {
+    io.err("the agent proposed no changes\n");
+    return 0;
+  }
+
+  io.err(`[1m${outcome.changes.length} file(s) proposed[0m\n`);
+  for (const change of outcome.changes) {
+    io.err(`  ${change.kind === "create" ? "+" : "~"} ${change.path}\n`);
+  }
+
+  const approved = await askApproval(
+    {
+      call: { id: "delegation", name: "apply changes", arguments: {} },
+      rule: "guarantees were suspended while the agent ran",
+    },
+    io,
+  );
+  if (!approved) {
+    io.err("\nnot applied\n");
+    return 1;
+  }
+
+  // Applies the change set already shown, rather than running the agent again.
+  // A second run would cost a second call and, worse, produce a different diff
+  // from the one the user just approved.
+  const applied = await applyDelegated(process.cwd(), outcome.changes);
+  if (!applied.applied) {
+    io.err(`\nnot applied: changed underneath — ${applied.conflicts.join(", ")}\n`);
+    return 1;
+  }
+
+  io.out(`applied ${outcome.changes.length} file(s)\n`);
+  return 0;
 }
 
 interface RunOutcome {

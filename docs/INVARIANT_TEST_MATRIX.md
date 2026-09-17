@@ -36,7 +36,7 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 21 | No unsafe sandbox fallback | `SEC-008` | permissions, runtime | green — v0.1 asserts AUTO is unselectable with no sandbox |
 | 29 | Security config composes monotonically | `SEC-013` | policy | green |
 | 33 | Memory scopes do not leak across workspaces | `SEC-017` | memory | green |
-| 34 | External-agent delegation is bounded and recorded as suspended guarantees | `SEC-018` | adapters, session | deferred (v0.3) — ExternalAgentAdapter is not built yet |
+| 34 | External-agent delegation is bounded and recorded as suspended guarantees | `SEC-018` | delegation, adapters | green — pulled forward to v0.1.1 |
 | 35 | Reasoning is a public rationale or it is not kept | `SEC-019` | adapters, audit | green |
 | 36 | Tool execution cannot bypass the Permission Broker | `SEC-020` | permissions, tools | green — restored from v2.1 #7 |
 | 41 | Simulated tool use is never presented as a completed action | `SEC-022` | session, adapters | green — found by dogfooding, not by review |
@@ -103,9 +103,10 @@ Additional orchestrator tests required by SPEC §31: `ORCH-001` (OBSERVE does no
 | Release | Invariants that must be `green` |
 |---|---|
 | v0.1 | 1, 2, 4, 5, 6, 7, 8, 9, 16, 17, 20, 21, 26, 27, 28, 29, 33, 35, 36, 41 |
+| v0.1.1 | + 34 |
 | v0.2-alpha | + 3, 10, 11, 12, 13, 14, 15, 31 |
 | v0.2-beta | + 18, 22, 23, 30, 32 |
-| v0.3 | + 24, 34, 37, 38, 39, 40 |
+| v0.3 | + 24, 37, 38, 39, 40 |
 | v0.3.1 | + 19 |
 | v0.4 | + 25 |
 | 1.0 | all 41, plus the efficacy gate of SPEC §28 |
