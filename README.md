@@ -5,9 +5,17 @@ A local-first, auditable AI agent harness. The repository is `OrchestrA`; the ha
 > Closed/verifiable tasks: seek verified consensus.
 > Open tasks: surface meaningful divergence.
 
-**Status: Phase 1.** All sixteen v0.1 invariants are green — authenticated daemon, path guard, permission broker, secret isolation, egress policy, audit and replay, cancellation, budgets, conflict detection, compaction. `dem run "hello"` completes end to end against a fake provider.
+**Status: v0.1 feature-complete.** All seventeen v0.1 invariants are green: authenticated daemon, path guard, permission broker, secret isolation, egress policy, memory scoping, audit and replay, cancellation, budgets, conflict detection, compaction.
 
-Still owed before v0.1 is done: a real OpenAI-compatible provider, scoped memory, and the long-lived PTY. The permission ceiling is `ASK` and stays there until a sandbox adapter lands in v0.2 (SPEC §19.1).
+`dem run "hello"` completes end to end. Point it at a local model with:
+
+```sh
+DEM_BASE_URL=http://127.0.0.1:8080 DEM_MODEL=qwen pnpm run dem run "..."
+```
+
+A non-loopback endpoint is refused unless `DEM_ALLOW_REMOTE=1`, and `dem models` states `LOCAL` or `REMOTE` before listing anything.
+
+The permission ceiling is `ASK` and stays there until a sandbox adapter lands in v0.2 (SPEC §19.1).
 
 ## Documents
 

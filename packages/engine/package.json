@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@dem/protocol": "workspace:*",
-    "better-sqlite3": "^11.10.0"
+    "better-sqlite3": "^11.10.0",
+    "node-pty": "^1.1.0"
   }
 }

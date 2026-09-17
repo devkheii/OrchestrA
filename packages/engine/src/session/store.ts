@@ -1,5 +1,5 @@
-import { NotImplemented } from "@dem/protocol";
 import { killProcessTree } from "../runtime/kill.js";
+import type { TerminalManager } from "../tools/terminal.js";
 import type { SessionEvent, SessionEventInput, SessionId } from "@dem/protocol";
 import type { Checkpoint } from "../compaction/checkpoint.js";
 
@@ -41,6 +41,8 @@ export { openSessionStore } from "./sqlite-store.js";
  * exists to catch.
  */
 export interface CancelTargets {
+  /** Terminal manager owning the PTYs below. */
+  terminals?: TerminalManager;
   /** Child process group/tree roots started by this run. */
   pids: number[];
   ptyIds: string[];
@@ -54,15 +56,37 @@ export async function cancelRun(targets: CancelTargets, graceMs: number): Promis
 
   for (const pid of targets.pids) killProcessTree(pid);
 
+  // PTYs are signalled alongside the plain processes rather than after them,
+  // so the grace period is shared instead of serialised.
+  //
+  // A terminal that already exited on its own is not an error — it is the
+  // outcome we wanted.
+  const ptyExits: Array<Promise<unknown>> = [];
+  for (const ptyId of targets.ptyIds) {
+    const session = targets.terminals?.get(ptyId);
+    if (!session) continue;
+    ptyExits.push(session.exited);
+    // The PTY's own process tree, not just the shell: a shell that spawned a
+    // build and was killed leaves the build running otherwise.
+    killProcessTree(session.pid);
+    session.kill();
+  }
+
   // Returning before the processes are actually gone would let a caller delete
   // the workspace, or report CANCELLED, while a child is still writing to it.
-  await waitForExit(targets.pids, graceMs);
+  // That makes the audit trail wrong at the moment it matters most.
+  await Promise.all([
+    waitForExit(targets.pids, graceMs),
+    withDeadline(Promise.all(ptyExits), graceMs),
+  ]);
+}
 
-  // PTY handles close after their processes, so a half-dead terminal is not
-  // left holding the session open. No PTY backend ships in v0.1.
-  if (targets.ptyIds.length > 0) {
-    throw new NotImplemented("PTY cleanup on cancel", "RUN-001");
-  }
+/** Resolve when `promise` settles or the deadline passes, whichever is first. */
+function withDeadline(promise: Promise<unknown>, ms: number): Promise<unknown> {
+  return Promise.race([
+    promise.catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, ms)),
+  ]);
 }
 
 /** Poll until every pid is gone, or the grace period expires. */
