@@ -308,16 +308,27 @@ const NO_TOOLS_NOTICE =
 /**
  * Markers of a model narrating a tool call rather than making one.
  *
- * Every current family has a syntax it falls back on when asked to act without
- * tools, and the danger is not the markup — it is the fabricated output that
- * follows it, which reads exactly like a real result.
+ * The first version of this was a list of literal tags, and it missed the very
+ * next model it met: a local Qwen wrote `<tool>{"name":...}</tool>`, which was
+ * not on the list, so the narration passed through as an answer. That is the
+ * denylist failure this codebase argues against in two other places, made
+ * here for a third time.
+ *
+ * These patterns are shaped by kind rather than by spelling. Any tag whose
+ * name contains "tool" or "function" counts, in any of the wrappings models
+ * reach for, and the last rule catches the shape itself: an object carrying a
+ * name and arguments, which is what a tool call is whatever it is wrapped in.
  */
 const SIMULATED_TOOL_SYNTAX: ReadonlyArray<[string, RegExp]> = [
-  ["<function_calls>", /<function_calls>/i],
-  ["<invoke name=", /<invoke\s+name=/i],
-  ["<function_response>", /<function_response>/i],
-  ["<tool_call>", /<tool_call>/i],
-  ["```tool_code", /```tool_code/i],
+  // <tool>, <tool_call>, <function_calls>, </function_response>, <toolcall> …
+  ["a tool-shaped tag", /<\/?\s*(?:tool|function)[a-z_]*\s*>/i],
+  ["<invoke name=", /<invoke\s+name\s*=/i],
+  // ```tool_code, ```tool_call, ```function
+  ["a tool-shaped code fence", /```\s*(?:tool|function)[a-z_]*/i],
+  // [TOOL_CALL], [/TOOL], <|tool_call|> …
+  ["a tool-shaped delimiter", /[[|<]\s*\/?\s*tool_?call\s*[\]|>]/i],
+  // The shape itself: a JSON object naming a call and its arguments.
+  ["a call-shaped JSON object", /\{\s*"(?:name|tool|function)"\s*:\s*"[^"]+"\s*,\s*"(?:arguments|parameters|input)"\s*:/i],
 ];
 
 function simulatedToolUse(answer: string): string | null {

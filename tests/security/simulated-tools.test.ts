@@ -25,7 +25,10 @@ class NarratingProvider implements Provider {
   readonly id = "narrator";
   lastRequest?: ModelRequest;
 
-  constructor(private readonly advertisesTools: boolean) {}
+  constructor(
+    private readonly advertisesTools: boolean,
+    private readonly narration?: string,
+  ) {}
 
   capabilities(): readonly string[] {
     return this.advertisesTools ? [CAP_TEXT_GENERATE, CAP_TOOL_CALL] : [CAP_TEXT_GENERATE];
@@ -37,6 +40,14 @@ class NarratingProvider implements Provider {
 
   async *run(request: ModelRequest): AsyncIterable<ModelEvent> {
     this.lastRequest = request;
+
+    // A specific narration, when a case is about one particular wrapping.
+    if (this.narration !== undefined) {
+      yield { type: "delta", text: this.narration };
+      yield { type: "done", reason: "stop" };
+      return;
+    }
+
     yield { type: "delta", text: "Reading the file now.\n\n" };
     yield { type: "delta", text: '<function_calls>\n<invoke name="Read">\n' };
     yield { type: "delta", text: "</function_calls>\n<function_response>\n<output>\n" };
@@ -95,10 +106,41 @@ describe("SEC-022: narrated tool use fails the run", () => {
     });
   });
 
-  it("names the syntax it saw, so the cause is not a mystery", async () => {
+  it("names the kind of syntax it saw, so the cause is not a mystery", async () => {
     await withTempDir(async (dir) => {
       const { outcome } = await ask(new NarratingProvider(true), dir);
-      expect(outcome.detail).toContain("<function_calls>");
+      expect(outcome.detail).toContain("tool-shaped");
+    });
+  });
+
+  it.each([
+    ["Anthropic-style", '<function_calls>\n<invoke name="Read">\n</function_calls>'],
+    ["a bare tool tag", '<tool>\n{"name": "read", "arguments": {"path": "a.txt"}}\n</tool>'],
+    ["a tool_call tag", '<tool_call>{"name":"read"}</tool_call>'],
+    ["a fenced block", '```tool_code\nread("a.txt")\n```'],
+    ["a delimiter form", '[TOOL_CALL] read a.txt [/TOOL_CALL]'],
+    ["bare call-shaped JSON", 'I will do: {"name": "read", "arguments": {"path": "a.txt"}}'],
+  ])("catches %s", async (_label, narration) => {
+    // The first version of this guard was a list of literal tags and missed
+    // the next model it met — a local Qwen using <tool>. Each row here is a
+    // wrapping some model actually reaches for.
+    await withTempDir(async (dir) => {
+      const provider = new NarratingProvider(true, narration);
+      const { outcome } = await ask(provider, dir);
+      expect(outcome.status).toBe("error");
+    });
+  });
+
+  it("does not fire on ordinary prose that merely mentions tools", async () => {
+    // A guard that trips on "you could use the read tool here" would make the
+    // harness unusable for talking about itself.
+    await withTempDir(async (dir) => {
+      const provider = new NarratingProvider(
+        true,
+        "You could use the read tool for that, or call a function that returns the name and arguments.",
+      );
+      const { outcome } = await ask(provider, dir);
+      expect(outcome.status).toBe("completed");
     });
   });
 

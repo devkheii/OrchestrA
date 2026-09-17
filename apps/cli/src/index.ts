@@ -343,7 +343,12 @@ async function runOnce(daemon: DaemonHandle, prompt: string, io: Io): Promise<nu
     ).json()) as RunOutcome;
   }
 
-  if (outcome.status === "budget") io.err(`\n${outcome.detail}\n`);
+  // Any unresolved outcome explains itself. The guard against narrated tool
+  // use is only useful if the user is told why the run stopped — otherwise
+  // they see the narration, no answer, and no reason.
+  if (outcome.detail && outcome.status !== "completed") {
+    io.err(`\n[1m${outcome.status}[0m: ${outcome.detail}\n`);
+  }
 
   const events = await fetch(`${daemon.url}/sessions/${id}/events`, {
     headers: { authorization: `Bearer ${daemon.token}` },
