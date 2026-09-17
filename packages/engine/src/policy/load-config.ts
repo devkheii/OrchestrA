@@ -31,6 +31,11 @@ export interface Settings {
   /** A reference — `env://NAME` or `secret://...` — never a literal. */
   apiKey?: string;
   agent?: string;
+  /** A .gguf to serve locally. Set it and the harness starts the server itself. */
+  modelPath?: string;
+  /** Binary that serves it. Defaults to `llama`. */
+  llamaCommand?: string;
+  contextSize?: number;
   allowRemote: boolean;
   security: SecurityConfig;
 }
@@ -82,7 +87,10 @@ export async function resolveSettings(options: LoadOptions): Promise<Settings> {
     security,
   };
 
-  for (const key of ["provider", "model", "baseUrl", "apiKey", "agent"] as const) {
+  const contextSize = merged["contextSize"];
+  if (typeof contextSize === "number") settings.contextSize = contextSize;
+
+  for (const key of ["provider", "model", "baseUrl", "apiKey", "agent", "modelPath", "llamaCommand"] as const) {
     const value = merged[key];
     if (typeof value === "string") settings[key] = value;
   }
@@ -162,6 +170,7 @@ function fromEnv(env: Record<string, string | undefined>): Record<string, unknow
   put("model", env["DEM_MODEL"]);
   put("baseUrl", env["DEM_BASE_URL"]);
   put("agent", env["DEM_AGENT"]);
+  put("modelPath", env["DEM_MODEL_PATH"]);
   // A key in the environment is not committed, so it may be a literal here.
   put("apiKey", env["DEM_API_KEY"] ?? env["ANTHROPIC_API_KEY"]);
   if (env["DEM_ALLOW_REMOTE"] === "1") out["allowRemote"] = true;

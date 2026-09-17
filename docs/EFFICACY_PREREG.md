@@ -8,7 +8,7 @@ This document exists so that Checkpoint B is decided by a rule written before an
 
 **Pre-registration commit:** `TBD` (hash, filled at commit time)
 **Experiment run date:** `TBD`
-**Council model fingerprints:** `TBD` (two locally-resident models within the 16GB VRAM target, from different model families — see §6 on correlation)
+**Council model fingerprints:** `TBD` (two models from different families, each of which fits the measured 8GB VRAM budget — see §6 on correlation, and §3.3 on why "locally-resident" had to be dropped)
 **Results file:** `docs/efficacy/<date>-results.md`
 
 ---
@@ -83,13 +83,32 @@ The four arms run the same tasks, so the comparison is paired (McNemar) and only
 
 At n = 300 with an expected discordance rate near 20%, the experiment can detect roughly an **8 percentage-point absolute** difference between arms C and D at 80% power. Detecting 5pp would require roughly 550 tasks per family; detecting 3pp, well over 1,200.
 
-The budget consequence at n = 300: 4 arms × 300 tasks × 3 deciding families ≈ 3,600 runs. On a 16GB single GPU with `SEQUENTIAL_LARGE`, at roughly 150s for all four arms of one task, that is **about 38 hours** of unattended execution — a long weekend.
+The budget consequence at n = 300: 4 arms × 300 tasks × 3 deciding families ≈ 3,600 runs. What that costs in wall-clock is now measured rather than assumed — see §3.3. On the reference machine it is on the order of **30–40 hours** of unattended execution, which is why §3.1 narrows the pilot to one family before any of it is spent.
 
 **This is deliberately treated as a practical-significance floor, not a budget limitation.** An effect that needs more than 300 paired samples per family to become visible is, by construction, smaller than 8pp — and an 8pp-or-smaller gain does not justify a mode that costs 2–4× the latency and roughly 2× the tokens. Therefore:
 
 > An effect not detectable at n = 300 is recorded as **not met**, not as "needs more data".
 
 Raising n later is permitted only if the *use case* changes — for example if Democracy is being evaluated strictly as a background/batch mode where latency is free, in which case a smaller effect may be worth having and a new pre-registration is filed.
+
+### 3.3 The measured machine, and what it forces
+
+This document originally assumed a 16GB single GPU. The machine the experiment will actually run on has **8192 MiB** (RTX 3060 Ti). That is not a footnote: it invalidates the execution model the budget above was written against.
+
+Measured, on that machine, through `llama.cpp`:
+
+| model | quant | resident size | throughput | one code task |
+|---|---|---|---|---|
+| Qwen2.5-Coder-7B | Q6_K | ~7.5GB | 57 tok/s, fully on GPU | ~6s |
+| Gemma 4 12B | Q4_K_M | ~7.5GB | 8.8 tok/s, partly on CPU | ~100s |
+
+Two consequences the design has to absorb:
+
+**Only one model is resident at a time.** Both fit 8GB alone; neither pair fits together. `SEQUENTIAL_LARGE` is not a mode choice here, it is the only mode. A council round is therefore load, run every task, unload, load the next — which means the experiment must be **batched by model, not by task**. Per-task model swapping would spend more time loading weights than deciding anything.
+
+**The arms are not symmetric in cost.** A Gemma turn is roughly 17× a Qwen turn, and 583 of 726 tokens in a representative Gemma response were reasoning tokens. The §4 latency guardrails (≤4× / ≤2×) were written before this was known; they are kept as stated, but a council that includes Gemma will breach them on this hardware. That outcome is a real result about local councils on consumer GPUs, not an execution failure, and it is recorded as **not met** rather than retried on different hardware.
+
+**Consequence for the decision rule:** none. §4 and §5 are unchanged. This section records what the numbers cost to obtain, not what counts as a pass.
 
 ---
 

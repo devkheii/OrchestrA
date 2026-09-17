@@ -7,20 +7,65 @@ A local-first, auditable AI agent harness. The repository is `OrchestrA`; the ha
 
 **Status: v0.1 feature-complete.** All seventeen v0.1 invariants are green: authenticated daemon, path guard, permission broker, secret isolation, egress policy, memory scoping, audit and replay, cancellation, budgets, conflict detection, compaction.
 
-`dem run "hello"` completes end to end. Point it at a model with either:
+## Install
 
 ```sh
-# A local OpenAI-compatible server (llama.cpp, a gateway)
-DEM_BASE_URL=http://127.0.0.1:8080 DEM_MODEL=qwen pnpm run dem run "..."
-
-# The Claude Code CLI, reusing credentials you already have (no tool calling)
-DEM_PROVIDER=claude-cli DEM_MODEL=sonnet DEM_ALLOW_REMOTE=1 pnpm run dem run "..."
-
-# The Anthropic API directly (bills per request; supports tool calling)
-DEM_PROVIDER=anthropic ANTHROPIC_API_KEY=sk-... DEM_ALLOW_REMOTE=1 pnpm run dem run "..."
+pnpm install
+pnpm run install:cli   # builds, then puts `dem` on your PATH
 ```
 
-Anything that sends context off the machine is refused unless `DEM_ALLOW_REMOTE=1`, and `dem models` states `LOCAL` or `REMOTE` before listing anything. The Claude CLI counts as remote even though the binary is local: the gate follows the data, not the executable.
+`dem` then works in any directory, and each directory is its own workspace: the path guard, the config file and the session log are all scoped to where you ran it.
+
+## Use
+
+```sh
+dem                      # interactive session — ask, follow up, keep the context
+dem run "..."            # one prompt, print the answer, exit
+dem log ses_...          # what actually happened in a session
+dem models               # what this daemon can reach, and whether it is LOCAL
+```
+
+An interactive session holds one session id for the whole conversation, so a follow-up builds on what came before rather than starting cold. `/new` discards it, `/session` prints the id, `/exit` leaves.
+
+When a tool needs approval you are asked, with the exact command in view:
+
+```
+shell  npm test
+requires approval in ASK mode
+allow? [y]es / [a]lways this session / [N]o
+```
+
+`a` remembers that tool with that exact subject for the rest of the session — saying yes to `npm test` does not say yes to `rm -rf build`. Everything else is asked again. The default is no, including when stdin is a pipe: something that cannot consent is not treated as consenting.
+
+`dem log` reads the same append-only event log the agent loop rebuilds the conversation from each round. It is the record, not a rendering of one.
+
+## Configure
+
+Write the model down once, in `.dem/config.json` — in the workspace, or in your home directory for a default across all of them:
+
+```json
+{
+  "baseUrl": "http://127.0.0.1:8099",
+  "model": "qwen2.5-coder-7b",
+  "modelPath": "C:/models/qwen2.5-coder-7b-q6_k.gguf"
+}
+```
+
+Set `modelPath` and the harness starts `llama serve` itself when nothing is listening on that port, and stops only what it started — a server you were already running is left alone, because loading a model takes long enough that killing someone else's is a real cost. Without `modelPath` you run the server yourself and the harness just attaches.
+
+Precedence is `CLI > environment > workspace > user > defaults` (SPEC §33). Security settings do not follow it: they compose monotonically, so a narrower scope can only tighten. A malformed config file is refused rather than skipped — believing your `maxMode` is in force when it silently is not is the opposite of what the setting was for.
+
+**Credentials never go in config as literals.** Config files get committed. Write a reference — `"apiKey": "env://ANTHROPIC_API_KEY"` — and the loader refuses anything that looks like a real key.
+
+## Providers
+
+```sh
+dem --model qwen run "..."                       # a local OpenAI-compatible server
+dem --provider claude-cli --allow-remote run ... # the Claude Code CLI, on your subscription
+dem --provider anthropic --allow-remote run ...  # the Anthropic API (bills per request)
+```
+
+Anything that sends context off the machine is refused unless `--allow-remote` (or `"allowRemote": true`), and `dem models` states `LOCAL` or `REMOTE` before listing anything. The Claude CLI counts as remote even though the binary is local: the gate follows the data, not the executable.
 
 The two Claude adapters look interchangeable and are not:
 
@@ -29,20 +74,17 @@ The two Claude adapters look interchangeable and are not:
 | `claude-cli` | Draws on your subscription's rate-limit window — the same one you use for your own work | **No.** Its own tools are stripped to keep them out of our permission broker |
 | `anthropic` | Bills per request against an API key | Yes |
 
-The harness's tests call neither. For work a model should do end to end, delegate instead — see below.
+The harness's tests call neither. For work a model should do end to end, delegate instead.
 
 The permission ceiling is `ASK` and stays there until a sandbox adapter lands in v0.2 (SPEC §19.1).
 
-For work a model should do end to end, hand it over instead:
+## Delegate
 
 ```sh
-DEM_ALLOW_REMOTE=1 pnpm run dem delegate "fix the failing auth test"
+dem --allow-remote delegate "fix the failing auth test"
 ```
 
-The agent runs in a copy of the workspace with its own tools, and its changes
-come back as a proposal you approve before anything here is touched. While it
-runs, this harness guarantees nothing about what it does — the record says so
-(SPEC §4.2).
+The agent runs in a copy of the workspace with its own tools, and its changes come back as a proposal you approve file by file before anything here is touched. While it runs, this harness guarantees nothing about what it does — the record says so (SPEC §4.2).
 
 ## Documents
 
@@ -74,6 +116,7 @@ Please read the current phase in the implementation plan before proposing a feat
 pnpm install
 pnpm run check      # typecheck + invariant matrix + tests
 pnpm run test:v01   # the v0.1 invariant suites only
+pnpm run build      # emit runnable JavaScript into dist/
 ```
 
 `pnpm run check` is expected to fail on the test step during Phase 0. What must hold is that every failure is a `NotImplemented` naming the test ID it owes work to — `tests/phase0-contract.test.ts` asserts exactly that, and it passes.

@@ -22,10 +22,24 @@ function capture(): Io & { stdout: string; stderr: string } {
 }
 
 describe("dem CLI", () => {
-  it("prints help and exits cleanly with no arguments", async () => {
+  it("prints help rather than opening a prompt when there is no terminal", async () => {
+    // Opening an interactive session on a pipe waits for input that never
+    // arrives, so `dem` in a script would hang instead of failing.
     const io = capture();
     expect(await main([], io)).toBe(0);
     expect(io.stdout).toContain("dem run <prompt>");
+  });
+
+  it("lists the interactive session first, since that is the usual way in", async () => {
+    const io = capture();
+    await main(["help"], io);
+    expect(io.stdout).toContain("start an interactive session");
+  });
+
+  it("documents where configuration comes from", async () => {
+    const io = capture();
+    await main(["help"], io);
+    expect(io.stdout).toContain(".dem/config.json");
   });
 
   it("says the permission ceiling is ASK, so nobody expects AUTO in v0.1", async () => {

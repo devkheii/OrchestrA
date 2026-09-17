@@ -1,10 +1,24 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { providerFromSettings, startDaemon } from "@dem/daemon";
-import { applyDelegated, delegate, resolveSettings, type Settings } from "@dem/engine";
+import {
+  applyDelegated,
+  delegate,
+  ensureModelServer,
+  resolveSettings,
+  type ModelServer,
+  type Settings,
+} from "@dem/engine";
 import { ClaudeCodeAgent, CodexAgent } from "@dem/adapters";
 import type { ProposedChange } from "@dem/engine";
 import type { DaemonHandle, SessionEvent } from "@dem/protocol";
+import { runInteractive } from "./interactive.js";
+import { readLine, runOnce, showLog } from "./commands.js";
+
+export { createSession, renderSince, runTurn } from "./session-ui.js";
+export type { Approver, PendingCall } from "./session-ui.js";
+export { sessionApprover } from "./interactive.js";
+export type { Ask } from "./interactive.js";
 
 /**
  * `dem` CLI (plan 4.5). The reference UX; Web and Desktop are later shells
@@ -32,7 +46,9 @@ export function defaultStateDir(): string {
 const HELP = `dem — local-first AI agent harness
 
 Usage:
+  dem                  start an interactive session
   dem run <prompt>     run one prompt to completion and print the answer
+  dem log <ses_id>     show what happened in a session
   dem delegate <task>  hand the whole task to an external agent
   dem models           list providers this daemon can reach
   dem help             show this message
@@ -107,11 +123,32 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
 
   switch (command) {
     case undefined:
+      // An interactive session needs someone to be there. Opening a prompt on
+      // a pipe waits for input that will never come, so `dem` in a script
+      // would hang rather than fail.
+      if (!process.stdin.isTTY) {
+        io.out(HELP);
+        return 0;
+      }
+      return withDaemon(settings, io, (daemon) => {
+        const selection = providerFromSettings(settings);
+        return runInteractive(daemon, settings, process.cwd(), selection.local, selection.label, io);
+      });
+
     case "help":
     case "--help":
     case "-h":
       io.out(HELP);
       return 0;
+
+    case "log": {
+      const id = rest[0];
+      if (!id) {
+        io.err("dem log: a session id is required\n");
+        return 2;
+      }
+      return withDaemon(settings, io, (daemon) => showLog(daemon, id, io));
+    }
 
     case "run": {
       const prompt = rest.join(" ").trim();
@@ -119,7 +156,7 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
         io.err("dem run: a prompt is required\n");
         return 2;
       }
-      return withDaemon(settings, io, (daemon) => runOnce(daemon, prompt, io));
+      return withDaemon(settings, io, (daemon) => runOnce(daemon, prompt, process.cwd(), io));
     }
 
     case "models":
@@ -262,87 +299,10 @@ async function selectChanges(
   const picked = new Set(
     trimmed
       .split(/[,\s]+/)
-      .map((n) => Number.parseInt(n, 10))
-      .filter((n) => Number.isInteger(n) && n >= 1 && n <= changes.length),
+      .map((n: string) => Number.parseInt(n, 10))
+      .filter((n: number) => Number.isInteger(n) && n >= 1 && n <= changes.length),
   );
   return changes.filter((_, i) => picked.has(i + 1));
-}
-
-function readLine(): Promise<string> {
-  return new Promise((resolve) => {
-    process.stdin.setEncoding("utf8");
-    process.stdin.resume();
-    process.stdin.once("data", (chunk: string) => {
-      process.stdin.pause();
-      resolve(chunk);
-    });
-  });
-}
-
-interface RunOutcome {
-  status: string;
-  detail?: string;
-  pending?: { call: { id: string; name: string; arguments: Record<string, unknown> }; rule: string };
-}
-
-/** Print tool activity the user has not seen yet. Returns the new watermark. */
-async function renderProgress(
-  daemon: DaemonHandle,
-  id: string,
-  io: Io,
-  from: number,
-): Promise<number> {
-  const res = await fetch(`${daemon.url}/sessions/${id}/events?since=${from}`, {
-    headers: { authorization: `Bearer ${daemon.token}` },
-  });
-  const { events } = (await res.json()) as { events: SessionEvent[] };
-
-  for (const event of events) {
-    if (event.type === "tool.finished") {
-      io.err(`[2m● ${event.tool}${event.ok ? "" : " (failed)"}[0m\n`);
-    }
-  }
-  return events.at(-1)?.seq ?? from;
-}
-
-/**
- * Ask the user about one pending call.
- *
- * The exact command is printed, not a summary of it. A prompt that says
- * "run a shell command?" trains the user to say yes without reading, which
- * turns every later approval into a formality.
- */
-async function askApproval(
-  pending: NonNullable<RunOutcome["pending"]>,
-  io: Io,
-): Promise<boolean> {
-  const { call, rule } = pending;
-  const detail =
-    typeof call.arguments["command"] === "string"
-      ? call.arguments["command"]
-      : JSON.stringify(call.arguments);
-
-  io.err(`\n[1m${call.name}[0m  ${detail}\n`);
-  io.err(`[2m${rule}[0m\n`);
-  io.err("allow? [y/N] ");
-
-  if (!process.stdin.isTTY) {
-    // Non-interactive: refuse rather than assume. A pipe cannot consent, and
-    // defaulting to yes would make every scripted run auto-approving.
-    io.err("\nno tty; declining\n");
-    return false;
-  }
-
-  return new Promise<boolean>((resolve) => {
-    process.stdin.setEncoding("utf8");
-    process.stdin.resume();
-    process.stdin.once("data", (chunk: string) => {
-      process.stdin.pause();
-      const answer = chunk.trim().toLowerCase();
-      io.err("\n");
-      resolve(answer === "y" || answer === "yes");
-    });
-  });
 }
 
 async function withDaemon(
@@ -358,9 +318,29 @@ async function withDaemon(
   try {
     provider = providerFromSettings(settings).provider;
   } catch (err) {
-    io.err(`dem: ${(err as Error).message}
-`);
+    io.err(`dem: ${(err as Error).message}\n`);
     return 1;
+  }
+
+  // A configured local model is served by us if nothing is serving it already.
+  // Without this the local path needed a second terminal and a port kept in
+  // sync by hand, which made the case this harness is built around the most
+  // awkward one to use.
+  let modelServer: ModelServer | undefined;
+  if (settings.modelPath && settings.baseUrl) {
+    try {
+      modelServer = await ensureModelServer(settings.baseUrl, {
+        modelPath: settings.modelPath,
+        command: settings.llamaCommand,
+        contextSize: settings.contextSize,
+      });
+      if (modelServer.started) {
+        io.err(`[2mstarted a model server at ${settings.baseUrl}[0m\n`);
+      }
+    } catch (err) {
+      io.err(`dem: ${(err as Error).message}\n`);
+      return 1;
+    }
   }
 
   const daemon = await startDaemon({ workspace: process.cwd(), stateDir, provider });
@@ -371,96 +351,10 @@ async function withDaemon(
     return 1;
   } finally {
     await daemon.close();
+    // Only stop what we started. A server the user was already running keeps
+    // running — loading a model takes long enough that killing someone else's
+    // is a real cost, not a tidy-up.
+    if (modelServer?.started) await modelServer.stop();
   }
 }
 
-async function runOnce(daemon: DaemonHandle, prompt: string, io: Io): Promise<number> {
-  const headers = {
-    authorization: `Bearer ${daemon.token}`,
-    "content-type": "application/json",
-  };
-
-  const created = await fetch(`${daemon.url}/sessions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ workspace: process.cwd() }),
-  });
-  const { id } = (await created.json()) as { id: string };
-
-  let outcome = (await (
-    await fetch(`${daemon.url}/sessions/${id}/messages`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ content: prompt }),
-    })
-  ).json()) as RunOutcome;
-
-  let shown = 0;
-
-  // The run stops at each approval rather than queueing them, so the user is
-  // answering one concrete command at a time instead of a batch they would
-  // skim. Work already done is printed before the question, so the decision is
-  // made with the transcript in view.
-  while (outcome.status === "awaiting_approval" && outcome.pending) {
-    shown = await renderProgress(daemon, id, io, shown);
-
-    const approved = await askApproval(outcome.pending, io);
-    if (!approved) {
-      io.err("\ndeclined; stopping here\n");
-      return 1;
-    }
-
-    outcome = (await (
-      await fetch(`${daemon.url}/sessions/${id}/approve`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ callId: outcome.pending.call.id }),
-      })
-    ).json()) as RunOutcome;
-  }
-
-  // Any unresolved outcome explains itself. The guard against narrated tool
-  // use is only useful if the user is told why the run stopped — otherwise
-  // they see the narration, no answer, and no reason.
-  if (outcome.detail && outcome.status !== "completed") {
-    io.err(`\n[1m${outcome.status}[0m: ${outcome.detail}\n`);
-  }
-
-  const events = await fetch(`${daemon.url}/sessions/${id}/events`, {
-    headers: { authorization: `Bearer ${daemon.token}` },
-  });
-  const { events: log } = (await events.json()) as { events: SessionEvent[] };
-
-  // Rationale goes to stderr, dimmed and prefixed. Visible while working, but
-  // never mixed into the answer a pipe or a script consumes — the separation
-  // the event stream keeps is only worth having if the display keeps it too.
-  const rationale = log
-    .filter((e) => e.type === "answer.rationale")
-    .map((e) => e.text)
-    .join("");
-
-  if (rationale) {
-    io.err("[2m┌ reasoning[0m\n");
-    for (const line of rationale.split("\n")) {
-      io.err(`[2m│ ${line}[0m\n`);
-    }
-    io.err("[2m└[0m\n\n");
-  }
-
-  for (const event of log) {
-    if (event.type === "tool.finished") {
-      io.err(`[2m● ${event.tool}${event.ok ? "" : " (failed)"}[0m\n`);
-    }
-  }
-  if (log.some((e) => e.type === "tool.finished")) io.err("\n");
-
-  for (const event of log) {
-    if (event.type === "answer.delta") io.out(event.text);
-  }
-  io.out("\n");
-
-  const failed = log.some((e) => e.type === "session.completed" && e.status === "error");
-  // The session id is the handle for `dem log` later, so it is always shown.
-  io.err(`\nsession ${id}\n`);
-  return failed ? 1 : 0;
-}

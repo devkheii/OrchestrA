@@ -535,7 +535,7 @@ two large sequential models
 three small parallel models
 ```
 
-On a single 16GB GPU, three small resident models may beat two large swapped ones on both latency and diversity. Measure it rather than assuming either way.
+On the measured machine — 8192 MiB, not the 16GB this plan first assumed — the middle row is the only one available for two 7B-class models: each is about 7.5GB, so they fit alone and never together. "Three small parallel" therefore means genuinely small models, and whether three weak voices beat two strong swapped ones is exactly the question, not a detail. Measure it rather than assuming either way; `docs/EFFICACY_PREREG.md` §3.3 records the measurements this is now based on.
 
 ## 6.5 Supervisor
 

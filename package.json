@@ -15,7 +15,9 @@
     "test:v01": "vitest run tests/security tests/runtime",
     "matrix": "node scripts/check-matrix.mjs",
     "check": "pnpm run typecheck && pnpm run matrix && pnpm run test",
-    "dem": "tsx apps/cli/src/bin.ts"
+    "dem": "tsx apps/cli/src/bin.ts",
+    "build": "node scripts/build.mjs",
+    "install:cli": "pnpm run build && npm link"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
@@ -28,5 +30,8 @@
     "@anthropic-ai/sdk": "^0.126.0",
     "better-sqlite3": "^11.10.0",
     "node-pty": "^1.1.0"
+  },
+  "bin": {
+    "dem": "./dist/apps/cli/src/bin.js"
   }
 }
