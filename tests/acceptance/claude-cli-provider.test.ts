@@ -91,6 +91,17 @@ describe("Claude CLI provider: streaming", () => {
     expect(textOf(events)).toBe("still works");
   });
 
+  it("refuses to run when the CLI still advertises a tool we did not disallow", async () => {
+    // The denylist cannot anticipate a tool added in a future CLI release, so
+    // an unexpected tool stops the run instead of quietly reaching the model
+    // with capabilities that never pass our permission broker.
+    const events = await collect(fakeProvider().run(ask("SCENARIO_LEAKED_TOOL")));
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe("error");
+    expect((events[0] as { message: string }).message).toContain("BrandNewTool");
+    expect((events[0] as { message: string }).message).toContain("permission broker");
+  });
+
   it("surfaces an error frame as an error event", async () => {
     const events = await collect(fakeProvider().run(ask("SCENARIO_ERROR")));
     expect(events.at(-1)).toEqual({ type: "error", message: "upstream failed" });

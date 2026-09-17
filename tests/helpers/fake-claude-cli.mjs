@@ -24,7 +24,10 @@ process.stdin.on("end", () => {
   const textDelta = (text) =>
     emit({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text } } });
 
-  emit({ type: "system", subtype: "init", tools: [], argv: process.argv.slice(2) });
+  // An empty tool surface is the expected state: the adapter disallows all of
+  // them. SCENARIO_LEAKED_TOOL reproduces a CLI release that added one.
+  const tools = prompt.includes("SCENARIO_LEAKED_TOOL") ? ["BrandNewTool"] : [];
+  emit({ type: "system", subtype: "init", tools, argv: process.argv.slice(2) });
 
   if (prompt.includes("SCENARIO_ERROR")) {
     emit({ type: "result", subtype: "error", is_error: true, result: "upstream failed" });

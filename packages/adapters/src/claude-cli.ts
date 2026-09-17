@@ -54,18 +54,54 @@ export interface ClaudeCliConfig {
   env?: NodeJS.ProcessEnv;
 }
 
-/** Tools the CLI must not use, because ours is the permission broker. */
+/**
+ * Every tool the CLI is known to ship. All of them are refused, because ours is
+ * the permission broker (invariant 7).
+ *
+ * `--allowedTools` cannot express this: it grants auto-approval without
+ * removing anything, so an "allow nothing" run still advertises Bash, Edit and
+ * PowerShell to the model. `--disallowedTools` is the only flag that removes a
+ * tool, which makes this a denylist — the pattern criticised two files over for
+ * environment variables, and for the same reason: it fails open for every tool
+ * nobody thought of. An earlier version of this list missed PowerShell,
+ * CronCreate and EnterWorktree, which is precisely the failure mode.
+ *
+ * So the list is paired with a runtime check in `run()` that refuses to
+ * proceed if the CLI still advertises anything. The denylist does the work; the
+ * check is what makes it fail closed when a future release adds a tool.
+ */
 const DISABLED_TOOLS = [
+  "AskUserQuestion",
   "Bash",
+  "BashOutput",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
   "Edit",
-  "Write",
-  "Read",
+  "EnterPlanMode",
+  "EnterWorktree",
+  "ExitPlanMode",
+  "ExitWorktree",
   "Glob",
   "Grep",
+  "KillShell",
+  "Monitor",
+  "NotebookEdit",
+  "PowerShell",
+  "PushNotification",
+  "Read",
+  "RemoteTrigger",
+  "ScheduleWakeup",
+  "Skill",
+  "SlashCommand",
   "Task",
+  "TaskOutput",
+  "TaskStop",
+  "TodoWrite",
+  "ToolSearch",
   "WebFetch",
   "WebSearch",
-  "NotebookEdit",
+  "Write",
 ];
 
 export class ClaudeCliProvider implements Provider {
@@ -150,6 +186,26 @@ export class ClaudeCliProvider implements Provider {
           continue;
         }
 
+        // The CLI reports its tool surface before generating anything. If our
+        // denylist did not cover everything — a new release, a renamed tool —
+        // the model is holding capabilities that never pass our permission
+        // broker, so the run is refused rather than allowed to proceed.
+        // Failing closed here is the difference between a stale list being a
+        // maintenance task and being a hole.
+        if (frame.type === "system" && frame.subtype === "init") {
+          const advertised = frame.tools ?? [];
+          if (advertised.length > 0) {
+            yield {
+              type: "error",
+              message:
+                `claude cli still advertises ${advertised.length} tool(s) after the disallow list: ` +
+                `${advertised.join(", ")}. Refusing to run: these would bypass the permission broker. ` +
+                `Add them to DISABLED_TOOLS.`,
+            };
+            return;
+          }
+        }
+
         // Token-level deltas. `thinking_delta` is deliberately not handled:
         // reasoning is dropped at the boundary, where it can still be told
         // apart from the answer (invariant 17).
@@ -214,6 +270,7 @@ export class ClaudeCliProvider implements Provider {
 interface CliFrame {
   type: string;
   subtype?: string;
+  tools?: string[];
   is_error?: boolean;
   result?: string;
   stop_reason?: string;
