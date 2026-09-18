@@ -27,7 +27,12 @@ for (const model of MODELS) {
   const outPath = join(OUT, `answers-${model.key}.jsonl`);
   const done = new Set(
     existsSync(outPath)
-      ? readFileSync(outPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).id)
+      ? readFileSync(outPath, "utf8")
+          .split("\n").filter(Boolean).map((l) => JSON.parse(l))
+          // An error is not an answer. README.md fixes that a failed request
+          // is re-run rather than scored, so it does not count as done.
+          .filter((r) => !r.error)
+          .map((r) => r.id)
       : [],
   );
   const todo = tasks.filter((t) => !done.has(t.task_id));
@@ -69,6 +74,14 @@ for (const model of MODELS) {
 }
 
 async function ask(model, prompt) {
+  // Streamed, and not for the progress display.
+  //
+  // A non-streamed request holds the connection open with no bytes until the
+  // whole answer is ready, and node's fetch gives up at 300s. On this card
+  // Gemma emits about 4.7 tok/s, so every task needing more than ~1,140 tokens
+  // failed at a constant 307s -- 47 of 60 -- and that failure looked like the
+  // model's, which is exactly the confusion the pre-registration forbids.
+  // Streaming returns the headers immediately and the timeout never applies.
   const res = await fetch(`http://127.0.0.1:${PORT}/v1/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -84,23 +97,51 @@ async function ask(model, prompt) {
         },
       ],
       max_tokens: model.maxTokens,
+      stream: true,
+      stream_options: { include_usage: true },
       ...SAMPLING,
     }),
   });
 
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
 
-  const body = await res.json();
-  const choice = body.choices?.[0];
-  return {
-    answer: choice?.message?.content ?? "",
-    // Kept separate, never concatenated into the answer. A reasoning model
-    // that thinks in prose would otherwise have its thinking graded as code
-    // (SPEC invariant 35 draws the same line for the same reason).
-    reasoning: choice?.message?.reasoning_content ?? null,
-    finish: choice?.finish_reason ?? null,
-    usage: body.usage ?? null,
-  };
+  let answer = "";
+  let reasoning = "";
+  let finish = null;
+  let usage = null;
+  let buffer = "";
+
+  const decoder = new TextDecoder();
+  for await (const chunk of res.body) {
+    buffer += decoder.decode(chunk, { stream: true });
+
+    // SSE frames are separated by a blank line, and a chunk can split one in
+    // half. Whatever follows the last separator stays in the buffer.
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+
+    for (const frame of frames) {
+      const line = frame.split("\n").find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+
+      const event = JSON.parse(payload);
+      if (event.usage) usage = event.usage;
+
+      const delta = event.choices?.[0]?.delta;
+      if (delta?.content) answer += delta.content;
+      // Its own accumulator, never appended to the answer. A reasoning model
+      // that thinks in prose would otherwise have its thinking graded as code
+      // (SPEC invariant 35 draws the same line for the same reason).
+      if (delta?.reasoning_content) reasoning += delta.reasoning_content;
+
+      const reason = event.choices?.[0]?.finish_reason;
+      if (reason) finish = reason;
+    }
+  }
+
+  return { answer, reasoning: reasoning || null, finish, usage };
 }
 
 async function startServer(model) {

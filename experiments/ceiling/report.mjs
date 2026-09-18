@@ -85,6 +85,38 @@ const decision =
       ? "PROCEED — headroom exists; run the pre-registered experiment"
       : "INCONCLUSIVE — extend to all 163 tasks before deciding";
 
+// Whether the rule's precondition held: that both arms were actually measured.
+//
+// A model that never emitted an answer was not wrong, it was not asked
+// properly. Counting that as a failure is what the pre-registration says to do
+// with a truncation, and that is still what the primary result above does —
+// the rule is not edited after seeing a number. But a rule applied to an arm
+// that could not answer half its tasks is reporting the budget, so the
+// condition is computed and stated next to the decision rather than left for a
+// reader to notice.
+const completed = (key) =>
+  [...graded.get(key).outcome.values()].filter((o) => o.note === "pass" || o.note === "fail").length;
+
+const passGiven = (key) => {
+  const vals = [...graded.get(key).outcome.values()];
+  const done = vals.filter((o) => o.note === "pass" || o.note === "fail");
+  return done.length ? vals.filter((o) => o.pass).length / done.length : 0;
+};
+
+// The blind spot that matters: tasks the stronger model failed and the other
+// one never finished. That is exactly the cell the ceiling is made of.
+const strongerKey = passA >= passB ? a.key : b.key;
+const otherKey = strongerKey === a.key ? b.key : a.key;
+const strongerFails = tasks
+  .map((t) => t.task_id)
+  .filter((id) => graded.get(strongerKey).outcome.get(id) && !graded.get(strongerKey).outcome.get(id).pass);
+const unattempted = strongerFails.filter((id) => {
+  const o = graded.get(otherKey).outcome.get(id);
+  return o && o.note !== "pass" && o.note !== "fail";
+});
+
+const valid = MODELS.every((m) => completed(m.key) === n);
+
 const lines = [
   `# Ceiling measurement — results`,
   ``,
@@ -112,6 +144,30 @@ const lines = [
   `## Decision`,
   ``,
   `> **${decision}**`,
+  ``,
+  `## Is this measurement valid?`,
+  ``,
+  valid
+    ? `Both models answered all ${n} tasks. The rule above applies as written.`
+    : [
+        `**No.** The rule above is reported as written — it is not edited after seeing a`,
+        `result — but its precondition did not hold.`,
+        ``,
+        ...MODELS.map((m) =>
+          `- **${m.key}**: answered ${completed(m.key)}/${n}; of those it answered, it passed ` +
+          `${(passGiven(m.key) * 100).toFixed(0)}%`),
+        ``,
+        `Worse than the count: of the ${strongerFails.length} tasks **${strongerKey}** got wrong — the only`,
+        `tasks where a council could gain anything — **${otherKey}** never finished ${unattempted.length}.`,
+        `The ceiling is made of exactly that cell, so it is measured on ` +
+          `${strongerFails.length - unattempted.length} of the ${strongerFails.length} tasks that could contribute to it.`,
+        ``,
+        `A truncated answer is scored as a failure because that is what was fixed in`,
+        `advance, and that is the right call for a model that cannot deliver inside a`,
+        `budget. It is the wrong call for deciding whether a council helps, because the`,
+        `model did not give a wrong answer — it gave no answer. Extending to 163 tasks`,
+        `would reproduce this blindness at 2.7x the cost, not resolve it.`,
+      ].join("\n"),
   ``,
   `## Answer quality notes`,
   ``,
