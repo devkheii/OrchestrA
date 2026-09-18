@@ -1,0 +1,8 @@
+{% if not add_generation_prompt is defined %}{% set add_generation_prompt = false %}{% endif %}{{ bos_token }}{% for message in messages %}{% if message['role'] == 'user' %}{{ '### Instruction:
+' + message['content'] + '
+' }}{% elif message['role'] == 'assistant' %}{{ '### Response:
+' + message['content'] + '
+<|EOT|>
+' }}{% elif message['role'] == 'system' %}{{ message['content'] + '
+' }}{% endif %}{% endfor %}{% if add_generation_prompt %}{{ '### Response:
+' }}{% endif %}

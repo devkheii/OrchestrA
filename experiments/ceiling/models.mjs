@@ -40,7 +40,14 @@ export const ALL = {
     label: "DeepSeek-Coder-6.7B-Instruct",
     quant: "Q6_K",
     family: "DeepSeek",
-    path: "E:/models/deepseek-coder-6.7b-instruct-Q6_K.gguf",
+    // QuantFactory's 2024 repack, not TheBloke's 2023 one. The older file
+    // carries no chat template and no pre-tokenizer type, so llama.cpp fell
+    // back to ChatML: the model was prompted in a format it was not trained on
+    // and its stop token was never recognised, so it answered correctly and
+    // then hallucinated a conversation with itself until the budget ran out --
+    // 58 of 60 tasks. The server's own log said GENERATION QUALITY WILL BE
+    // DEGRADED. That is a defective fixture, not a model result.
+    path: "E:/models/deepseek-coder-6.7b-instruct-QF-Q6_K.gguf",
     contextSize: 4096,
     maxTokens: 1024,
     gpuLayers: 999,

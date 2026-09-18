@@ -198,14 +198,34 @@ async function startServer(model) {
 }
 
 async function waitReady() {
-  const deadline = Date.now() + 600_000;
+  // Probes with the endpoint the run actually uses.
+  //
+  // `/v1/models` answers 200 while the weights are still loading, and
+  // completions then answer 503 "Loading model". Treating the listing as
+  // readiness sends the first task into a 503, which is recorded as a request
+  // error and silently costs that task its answer for the whole run.
+  const deadline = Date.now() + 900_000;
   for (;;) {
     try {
-      const res = await fetch(`http://127.0.0.1:${PORT}/v1/models`);
+      const res = await fetch(`http://127.0.0.1:${PORT}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "ready?" }],
+          max_tokens: 1,
+          temperature: 0,
+        }),
+      });
       if (res.ok) return;
-    } catch {}
-    if (Date.now() > deadline) throw new Error("model server did not become ready in 10 minutes");
-    await sleep(1000);
+      // 503 is "still loading"; anything else is a real failure worth showing.
+      if (res.status !== 503) {
+        throw new Error(`model server answered ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("model server answered")) throw err;
+    }
+    if (Date.now() > deadline) throw new Error("model server did not become ready in 15 minutes");
+    await sleep(2000);
   }
 }
 
