@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MODELS, LLAMA, PORT, SAMPLING } from "./models.mjs";
+import { ALL, MODELS, LLAMA, PORT, SAMPLING } from "./models.mjs";
 
 /**
  * Ask each model every task, batched by model.
@@ -19,10 +19,18 @@ const TASKS = "data/tasks.jsonl";
 const tasks = readFileSync(TASKS, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
 mkdirSync(OUT, { recursive: true });
 
-const only = process.argv[2];
+// Named models, or run 1's pair when nothing is named. Naming them is how a
+// second run selects a different set without editing this file.
+const named = process.argv.slice(2).filter((a) => !a.startsWith("-"));
+const selected = named.length
+  ? named.map((key) => {
+      const model = ALL[key];
+      if (!model) throw new Error(`unknown model "${key}"; known: ${Object.keys(ALL).join(", ")}`);
+      return model;
+    })
+  : MODELS;
 
-for (const model of MODELS) {
-  if (only && model.key !== only) continue;
+for (const model of selected) {
 
   const outPath = join(OUT, `answers-${model.key}.jsonl`);
   const done = new Set(
