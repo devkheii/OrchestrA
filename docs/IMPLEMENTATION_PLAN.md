@@ -539,7 +539,19 @@ On the measured machine — 8192 MiB, not the 16GB this plan first assumed — t
 
 ## 6.5 Supervisor
 
-Added only now. Default `on_disagreement`. Actions `ACCEPT | RETRY | ABSTAIN`. Subordinate to deterministic verification and validated counterexamples.
+**Required, not optional** (SPEC §13, invariant 43). A council that disagrees
+has produced no answer, and the members that just failed to agree are the worst
+available tie-breaker. Composing a council without a supervisor is refused at
+composition time rather than falling back at runtime.
+
+The supervisor is the most capable model the session can reach. Default mode
+`on_disagreement`. Actions `ACCEPT | RETRY | ABSTAIN`. Subordinate to
+deterministic verification and validated counterexamples — promoting it to a
+required role does not promote it above the checks that exist because models
+are confidently wrong.
+
+What the weaker members then add is an open question, and §28's `D - C` is what
+measures it. Do not treat the structure as the answer.
 
 ## 6.6 Telemetry collection
 
@@ -650,7 +662,18 @@ Requires mature profiles, a passed efficacy gate for the task family, satisfied 
 
 ## 9.2 Weighted council
 
-Default stays `equal`. Advanced modes `weighted` and `expert_supervisor`. Weight sources: user override, established local profile, established operational profile, domain specialization. Never self-reported confidence. Validated counterexample and verifier failure beat any weight (`DEC-014`).
+Default stays `equal`. Advanced modes `weighted` and `expert_supervisor`.
+
+Weights are declared, not earned on the user's machine (SPEC §12.1): user
+override, a published prior labelled with what it describes, a domain profile,
+or operational evidence that accumulated passively from real work. A local
+benchmark suite is optional refinement and never a prerequisite — requiring one
+charged every user hours of GPU for a number a published figure already
+estimates within a couple of points.
+
+Never self-reported confidence. An undeclared weight is equal weight, never a
+guess. Every weight records its provenance (`DEC-015`). Validated counterexample
+and verifier failure beat any weight (`DEC-014`).
 
 ## 9.3 Automatic council composition
 

@@ -87,6 +87,9 @@ The core differentiation is:
 40. **Scheduling estimates are evidence, not claims.** An ETA or score is recorded alongside the actual outcome, so a prediction can be checked against what happened rather than standing on its own.
 41. **Simulated tool use is never presented as a completed action.** A model that writes tool-call syntax instead of calling a tool has not acted, and any result it goes on to report was invented. The run ends in error naming what happened, rather than the narration being scrubbed and the conclusion drawn from it left standing. A provider that cannot call tools is told so and is offered none.
 
+42. **A weight carries its provenance.** Every weight in a council records where it came from — user override, published prior, domain profile, or accumulated operational evidence — and an undeclared weight is equal weight. A number with no stated source cannot be told apart from a guess, and a guess about which model is stronger decides the answer while looking like arithmetic.
+43. **A council always has a designated supervisor.** A council that disagrees has produced no answer, and deciding what happens next cannot be delegated to another vote among the members that just failed to agree. Composing a council without a supervisor is a configuration error refused at composition time, never a runtime fallback. The supervisor remains subordinate to deterministic verification (invariant 15) and to validated counterexamples (invariant 14).
+
 Every invariant maps to at least one automated test ID; see §32 and `docs/INVARIANT_TEST_MATRIX.md`.
 
 ---
@@ -431,14 +434,36 @@ weighted
 expert_supervisor
 ```
 
-Weights can come from:
+### 12.1 Where a weight may come from
+
+Weights are **declared, not earned on the user's machine.** In order of
+authority:
 
 - explicit user override;
-- established local benchmark profile;
-- established operational profile;
-- domain specialization profile.
+- a published prior, shipped with the harness or supplied in config, labelled
+  with its source and the build it describes (invariant 38);
+- a domain specialization profile;
+- an operational profile, where one has accumulated passively from real work
+  (§25.1).
+
+A local benchmark suite is an optional refinement and is never a prerequisite.
+Earlier revisions required an `established` local profile before a weight could
+be trusted, which put a measurement burden on every user for a number that a
+published figure already estimates well: on the reference machine a quantized
+Qwen2.5-Coder-7B measured 76.7% against a published 78% on the same set. The
+prior was worth about 1.5 points of error, and hours of the user's GPU.
 
 Weights cannot come from self-reported confidence.
+
+**An undeclared weight is equal weight.** A model with no prior, no override
+and no profile enters the council at parity rather than at a guess. Guessing
+would make the weighting silently depend on which models happen to be famous.
+
+Every weight carries its provenance into the decision record, so a reader can
+tell a measured number from a published one from a user's opinion (invariant
+42).
+
+### 12.2 What a weight cannot do
 
 Weight cannot override:
 
@@ -446,18 +471,34 @@ Weight cannot override:
 - validated counterexample;
 - hard privacy/security policy.
 
+Nor can it readmit a candidate that failed a hard constraint: capability,
+context capacity, privacy, resource fit and budget are filters applied before
+scoring, and no weight reaches back past them (invariant 39).
+
 ---
 
 ## 13. Supervisor
 
+**Every council has a designated supervisor** (invariant 43). A council that
+disagrees has, by construction, produced no answer; something has to decide
+what happens next, and leaving that to a vote among the members that just
+failed to agree is how a tie becomes a coin flip.
+
+The supervisor is the most capable model available to the session, which will
+usually not be the cheapest. Assembling a council does not remove the need for
+one strong judgment; it changes what that judgment is applied to, from writing
+the answer to ruling on a disagreement that has already been made explicit.
+
 Modes:
 
 ```text
-off
-on_disagreement
+on_disagreement   (default)
 final
 always
 ```
+
+`off` is not a mode. A council with no supervisor is a configuration error
+reported at composition time, not a fallback entered at runtime.
 
 Allowed actions:
 
@@ -472,7 +513,27 @@ Supervisor is not the same as Comparator:
 - Comparator: are decisions compatible?
 - Supervisor: what should the system do when policy, disagreement, or risk remains unresolved?
 
-Expert supervisors may receive domain-specific profile advantages, but remain subordinate to deterministic verification.
+### 13.1 What the supervisor is subordinate to
+
+Promoting the supervisor to a required role does not promote it above the
+checks that exist because models are wrong confidently:
+
+- a deterministic verifier failure overrides the supervisor's preference
+  (invariant 15);
+- a `VALIDATED` counterexample blocks a strong final result whatever the
+  supervisor prefers and whatever weight its author carries (invariant 14);
+- the supervisor's ruling is recorded as an action with its reason, not merged
+  into the answer as if the council had agreed.
+
+Expert supervisors may receive domain-specific profile advantages, but remain
+subordinate to deterministic verification.
+
+### 13.2 The open question this leaves
+
+If the strongest model rules on every disagreement, what the weaker members add
+is no longer obvious. That is exactly the quantity §28's `D - C` was written to
+measure, and this section does not answer it. Recorded here so that a later
+reading does not mistake a structural decision for an empirical one.
 
 ---
 
@@ -814,16 +875,34 @@ Background jobs require explicit remote budget before using paid providers.
 Three evidence layers:
 
 ```text
-online prior
-local benchmark
-operational evidence
+online prior          declared, free, weakest
+operational evidence  passive, accumulates from real work
+local benchmark       optional, never required
 ```
 
-Online prior is weakest.
+Online prior is the weakest evidence and the default source. It is labelled
+with what it describes and never reported as a local measurement (invariant
+38).
 
-Operational evidence is counted only when the task has an independent verification outcome or trusted evaluation label.
+### 25.1 Nothing here is a suite the user runs
 
-Profile maturity:
+Earlier revisions made `established` maturity — 100 verified samples — a
+precondition for trusting a weight. That is hours of a user's hardware before
+the harness is useful, spent to refine a number a published figure already
+estimates within a couple of points.
+
+So:
+
+- **Online prior** is declared. It costs nothing and is always available.
+- **Operational evidence** accumulates from work the user was doing anyway, and
+  only from tasks that carried an independent verification outcome or trusted
+  label (invariant 18). It is never a suite; if the user runs nothing special,
+  it simply stays thin.
+- **A local benchmark suite is optional.** It refines a profile for someone who
+  wants that. Nothing requires it, and no capability is withheld for its
+  absence.
+
+Maturity labels still describe how much evidence stands behind a number:
 
 ```text
 experimental: n < 30
@@ -831,9 +910,28 @@ provisional: 30 <= n < 100
 established: n >= 100
 ```
 
-Report score with sample size and uncertainty/confidence interval where meaningful.
+They qualify a claim; they no longer gate a weight. Report score with sample
+size and uncertainty/confidence interval where meaningful.
 
-Do not build a large custom quick-suite in early releases. Start from small licensed/adapted task sets and real verified operational telemetry.
+### 25.2 What a prior cannot tell you
+
+A published score describes whether a model *can* answer. It says nothing about
+whether this machine can get that answer out of it.
+
+Measured while writing this: a 12B reasoning model with respectable published
+figures could not finish 29 of 60 code tasks within a 3,072-token budget on an
+8GB card, spending an average of 8,129 characters of reasoning and emitting 26
+characters of answer. No leaderboard reports that, because it is not a property
+of the model — it is a property of this deployment.
+
+Fit is therefore a **hard constraint checked locally, not a score** (invariant
+39). The check is a single probe — does this model return an answer within the
+configured budget on this machine — measured in seconds, and its result filters
+the candidate before any weight is consulted. That is the only local
+measurement the harness requires of anyone.
+
+Do not build a large custom quick-suite in early releases. Start from small
+licensed/adapted task sets and real verified operational telemetry.
 
 ---
 
@@ -911,6 +1009,13 @@ Do not swap unless predicted total utility gain exceeds the configured threshold
 Do **not** build the full Orchestrator before proving Democracy value.
 
 The minimal Democracy experiment occurs immediately after the safe single-agent baseline.
+
+**This gate is run once, by this project, before release. It is not a feature,
+it does not ship, and no user ever runs it.** It decides whether Democracy mode
+is offered at all and whether it may be a default. Its cost is paid here, once,
+and never charged to anyone installing the harness — which is also why it may
+be expensive enough to be worth trusting (§25.1 draws the same line for
+profiles).
 
 ### 28.1 Required arms
 
@@ -1036,6 +1141,9 @@ Required:
 
 - sandbox adapter + health probe (prerequisite for the counterexample runner);
 - static 2-model council;
+- a designated supervisor, defaulting to `on_disagreement` (invariant 43);
+- declared weights with recorded provenance, defaulting to equal (invariant 42);
+- a local fit probe as a hard filter before scoring (§25.2, invariant 39);
 - blind Round 1;
 - DecisionEnvelope;
 - task override/classification;
@@ -1061,13 +1169,13 @@ Add:
 - more robust evidence/objection paths;
 - telemetry collection;
 - sequential/parallel-small/hybrid execution strategies;
-- optional supervisor.
+- supervisor modes beyond the v0.2-alpha default (`final`, `always`).
 
 ### v0.3 — Orchestrator Recommend
 Add:
 
-- capability profiles;
-- profile maturity;
+- capability profiles, as optional refinement over declared priors (§25.1);
+- profile maturity as a label on a claim, not a gate on a weight;
 - ETA prediction;
 - residency metrics;
 - recommendation mode.
@@ -1147,7 +1255,9 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `DEC-011` unresolved task-type resolution falls back to `open`;
 - `DEC-012` `DIVERGENT`/`ABSTAIN` pauses an interactive run with no further mutation or spend;
 - `DEC-013` non-interactive job terminates on `DIVERGENT` with a distinct exit status;
-- `DEC-014` a `VALIDATED` objection blocks a strong final result even when the objecting member carries the lower weight.
+- `DEC-014` a `VALIDATED` objection blocks a strong final result even when the objecting member carries the lower weight;
+- `DEC-015` a weight records its provenance, and a member with no declared weight enters at parity;
+- `DEC-016` composing a council without a supervisor is refused at composition time.
 
 **Runtime**
 
@@ -1190,7 +1300,9 @@ No release may contain an invariant without a test or an explicit documented exc
 
 **Removing an invariant is an explicit act.** Six invariants were lost between v2.1 and v2.2 — tool execution bypassing the permission broker, child-policy inheritance, memory scope isolation, and three about benchmark and scheduling honesty. None was argued down; the list was renumbered and they fell out. A tool that checks invariants against tests cannot catch this, because an invariant with no row has nothing to check.
 
-So an invariant leaves this document only by being moved to the Exceptions section with a reason, and the matrix carries a provenance column naming the revision each invariant came from. A future revision that renumbers the list can then be diffed against its predecessor rather than read for what it gained.
+So an invariant leaves this document only by being moved to the Exceptions section with a reason, and the matrix carries a provenance column naming the revision each invariant came from.
+
+**Change of 2026-09-18 — local measurement stops being a precondition.** §12 no longer requires an `established` local benchmark profile before a weight may be used, and §25 demotes the local benchmark suite to optional. This removes a requirement, not an invariant: 18, 25, 38, 39 and 40 are unchanged and 38 does more work than before, since priors are now the ordinary source of a weight rather than the weakest fallback. Two invariants were added rather than removed — 42 (a weight carries its provenance) and 43 (a council has a supervisor) — because making weights declarative creates a new way to be wrong quietly, and promoting the supervisor to a required role creates a new way to be overruled quietly. A future revision that renumbers the list can then be diffed against its predecessor rather than read for what it gained.
 
 ---
 

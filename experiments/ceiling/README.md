@@ -1,6 +1,7 @@
 # Ceiling measurement — a screen for Checkpoint B
 
 **Written 2026-09-18, before any model had answered any task.**
+**Run once, by this project. Not a feature, does not ship, no user ever runs it** (SPEC §28).
 **Governs:** whether the v0.2-alpha council in `docs/SPEC.md` §30 gets built at all.
 
 This is not the pre-registered efficacy experiment. That is

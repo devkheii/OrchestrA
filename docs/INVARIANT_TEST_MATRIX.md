@@ -44,6 +44,8 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 38 | An online benchmark score is never presented as a local measurement | `ORCH-007` | benchmark | deferred (v0.3) — restored from v2.1 #20 |
 | 39 | Hard constraints are not scoreable | `ORCH-005` | orchestrator | deferred (v0.3) — restored from v2.1 #23; the test survived, the invariant did not |
 | 40 | Scheduling estimates are evidence, not claims | `ORCH-002` | orchestrator | deferred (v0.3) — restored from v2.1 #25; the test survived, the invariant did not |
+| 42 | A weight carries its provenance; an undeclared weight is equal weight | `DEC-015` | council, benchmark | deferred (v0.2-alpha) — added 2026-09-18 with the move to declared weights |
+| 43 | A council always has a designated supervisor | `DEC-016` | council | deferred (v0.2-alpha) — added 2026-09-18; supervisor promoted from optional mode to required role |
 | 31 | Model-authored code runs only in a healthy sandbox, never against the live workspace | `SEC-009`, `SEC-010`, `SEC-011`, `SEC-012` | counterexample, runtime | deferred (v0.2-alpha) |
 
 Note on #21: the invariant is testable in v0.1 even though the sandbox adapter is absent. The v0.1 assertion is the negative one — with no sandbox present, AUTO and FULL_ACCESS must be unselectable. The positive case (healthy sandbox enables AUTO) is added in v0.2-alpha.
@@ -95,6 +97,8 @@ Note on #20: `RUN-006` is written in v0.1 against the provenance fields that exi
 | 25 | AUTO orchestration requires sufficient telemetry | `ORCH-003` | orchestrator, benchmark | deferred (v0.4) |
 
 Additional orchestrator tests required by SPEC §31: `ORCH-001` (OBSERVE does not bind), `ORCH-002` (ETA predicted/actual recorded), `ORCH-005` (hard filter beats score).
+
+Note on 42 and 43: both arrive with the council in v0.2-alpha, so neither can be red before it. They are recorded now because the decision that created them was made now — the alternative is the failure mode §32 exists to prevent, where a requirement is agreed in conversation and never reaches a document.
 
 ---
 
