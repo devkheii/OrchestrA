@@ -164,6 +164,10 @@ async function startServer(model) {
       "--port", String(PORT),
       "-c", String(model.contextSize),
       "-ngl", String(model.gpuLayers),
+      // Per-model server flags, e.g. KV cache quantization. Kept out of the
+      // shared list because they change what the model computes, so a model
+      // that carries them is a different measurement, not a faster one.
+      ...(model.extraArgs ?? []),
       "--no-warmup",
     ],
     { stdio: ["ignore", "pipe", "pipe"] },

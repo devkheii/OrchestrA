@@ -66,6 +66,42 @@ export const ALL = {
     maxTokens: 1024,
     gpuLayers: 999,
   },
+  // A control, not a council member. Identical weights and settings to `qwen`,
+  // differing only in KV cache quantization, so that re-scoring it answers one
+  // question: does q4_0 KV move verdicts on this benchmark?
+  //
+  // It matters because q4 KV is what makes a reasoning model fast enough to
+  // measure here (8.6 -> 15.1 tok/s), and buying speed by degrading the model
+  // would mean measuring a different model. Received wisdom says q4 KV is a
+  // real trade and q8_0 is near-lossless; this turns that into a number on the
+  // set actually in use.
+  // The same control at q8_0. q4_0 did not degrade this model, it destroyed
+  // it: 0/60, answering with a bare "from" inside a code fence in 7 tokens.
+  // Received wisdom is that the K cache is far more sensitive than the V cache
+  // and that q8_0 is near-lossless; this measures whether that holds here.
+  qwen_kv8: {
+    key: "qwen_kv8",
+    label: "Qwen2.5-Coder-7B-Instruct (q8_0 KV)",
+    quant: "Q6_K",
+    family: "Qwen",
+    path: "E:/models/Qwen2.5-Coder-7B-Instruct-Q6_K.gguf",
+    contextSize: 4096,
+    maxTokens: 1024,
+    gpuLayers: 999,
+    extraArgs: ["-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0"],
+  },
+
+  qwen_kv4: {
+    key: "qwen_kv4",
+    label: "Qwen2.5-Coder-7B-Instruct (q4_0 KV)",
+    quant: "Q6_K",
+    family: "Qwen",
+    path: "E:/models/Qwen2.5-Coder-7B-Instruct-Q6_K.gguf",
+    contextSize: 4096,
+    maxTokens: 1024,
+    gpuLayers: 999,
+    extraArgs: ["-fa", "on", "-ctk", "q4_0", "-ctv", "q4_0"],
+  },
 };
 
 /** Run 1's pair, so report.mjs keeps producing run 1's report unchanged. */
