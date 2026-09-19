@@ -5,7 +5,9 @@ import {
   applyDelegated,
   delegate,
   ensureModelServer,
+  explainSmokeFailure,
   resolveSettings,
+  runSmokeTest,
   type ModelServer,
   type Settings,
 } from "@dem/engine";
@@ -58,6 +60,7 @@ Options (override config for this run):
   --provider <kind>    anthropic | claude-cli | (default: OpenAI-compatible)
   --agent <kind>       claude-code | codex, for delegate
   --allow-remote       permit anything that sends context off this machine
+  --skip-smoke-test    run even if this model configuration fails its check
 
 Configuration is read from .dem/config.json in this workspace and in your home
 directory, then the environment, then these flags (SPEC 33). Write the model
@@ -86,6 +89,7 @@ async function settingsFor(argv: readonly string[]): Promise<Settings> {
     else if (arg === "--provider" && argv[i + 1]) cli["provider"] = argv[++i];
     else if (arg === "--agent" && argv[i + 1]) cli["agent"] = argv[++i];
     else if (arg === "--allow-remote") cli["allowRemote"] = true;
+    else if (arg === "--skip-smoke-test") cli["skipSmokeTest"] = true;
   }
 
   return resolveSettings({
@@ -102,7 +106,7 @@ function withoutFlags(argv: readonly string[]): string[] {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--model" || arg === "--provider" || arg === "--agent") { i++; continue; }
-    if (arg === "--allow-remote") continue;
+    if (arg === "--allow-remote" || arg === "--skip-smoke-test") continue;
     out.push(arg);
   }
   return out;
@@ -339,6 +343,40 @@ async function withDaemon(
       }
     } catch (err) {
       io.err(`dem: ${(err as Error).message}\n`);
+      return 1;
+    }
+  }
+
+  // Is this configuration working at all (invariant 44, SPEC 25.3)?
+  //
+  // A published figure describes a model; the weight of trust is placed on a
+  // deployment. On the reference machine, adding `-ctk q4_0` to fit the card
+  // took a model from 46/60 to 0/60 while still answering in 1.4 seconds, so
+  // anything that checks only for a response passes it.
+  //
+  // Five trivial questions, cached by configuration, re-run when the model
+  // file, quantization or server flags change. Seconds once per setup.
+  //
+  // Only for a model this machine serves. The built-in fake has nothing to
+  // prove, and a remote endpoint would be probed with the user's own quota to
+  // catch failure modes — a quantized cache, a GGUF with no chat template —
+  // that only exist when we are the ones serving the weights.
+  const servesLocally =
+    providerFromSettings(settings).local && Boolean(settings.modelPath ?? settings.baseUrl);
+
+  if (servesLocally && !settings.skipSmokeTest) {
+    const smokeConfig = {
+      model: settings.model,
+      modelPath: settings.modelPath,
+      args: settings.llamaArgs,
+    };
+    const smoke = await runSmokeTest(provider, { config: smokeConfig, cacheDir: stateDir });
+    if (!smoke.ok) {
+      io.err(`dem: ${explainSmokeFailure(smoke, smokeConfig)}
+`);
+      io.err(`  Pass --skip-smoke-test to run anyway.
+`);
+      if (modelServer?.started) await modelServer.stop();
       return 1;
     }
   }

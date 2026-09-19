@@ -17,4 +17,5 @@ export * from "./runtime/kill.js";
 export * from "./memory/store.js";
 export * from "./delegation/delegate.js";
 export * from "./policy/load-config.js";
+export * from "./policy/smoke-test.js";
 export * from "./runtime/model-server.js";

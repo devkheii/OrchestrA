@@ -53,6 +53,25 @@ Write the model down once, in `.dem/config.json` — in the workspace, or in you
 
 Set `modelPath` and the harness starts `llama serve` itself when nothing is listening on that port, and stops only what it started — a server you were already running is left alone, because loading a model takes long enough that killing someone else's is a real cost. Without `modelPath` you run the server yourself and the harness just attaches.
 
+The first time the harness serves a model it has not seen configured this way,
+it asks the model five trivial questions with known answers. This takes
+seconds, is cached, and re-runs only when the model file, quantization or
+server flags change.
+
+It exists because of a measured failure. Quantizing the KV cache to `q4_0` to
+fit an 8GB card took a model from 46/60 on HumanEval+ to **0/60** — answering a
+bare `from` inside a code fence in 1.4 seconds — while every published figure
+still said 78%. `q8_0` cost nothing at all and ran eleven times faster.
+
+So a check that only asks whether an answer came back would have passed it.
+This one asks whether the answer is right, and refuses to run a configuration
+that cannot add 17 and 25. `--skip-smoke-test` overrides it.
+
+It catches configurations that are **broken**, not ones that are merely worse.
+Nothing here will notice that your setup quietly costs seven points of
+accuracy, because noticing would mean making every user run a benchmark. That
+trade is deliberate (SPEC §25.3).
+
 Precedence is `CLI > environment > workspace > user > defaults` (SPEC §33). Security settings do not follow it: they compose monotonically, so a narrower scope can only tighten. A malformed config file is refused rather than skipped — believing your `maxMode` is in force when it silently is not is the opposite of what the setting was for.
 
 **Credentials never go in config as literals.** Config files get committed. Write a reference — `"apiKey": "env://ANTHROPIC_API_KEY"` — and the loader refuses anything that looks like a real key.

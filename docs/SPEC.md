@@ -90,6 +90,8 @@ The core differentiation is:
 42. **A weight carries its provenance.** Every weight in a council records where it came from — user override, published prior, domain profile, or accumulated operational evidence — and an undeclared weight is equal weight. A number with no stated source cannot be told apart from a guess, and a guess about which model is stronger decides the answer while looking like arithmetic.
 43. **A council always has a designated supervisor.** A council that disagrees has produced no answer, and deciding what happens next cannot be delegated to another vote among the members that just failed to agree. Composing a council without a supervisor is a configuration error refused at composition time, never a runtime fallback. The supervisor remains subordinate to deterministic verification (invariant 15) and to validated counterexamples (invariant 14).
 
+44. **A model configuration is proved working before it is trusted.** A published prior describes a model; a weight and a council seat are given to a *deployment*. Before a configured model carries either, it answers a small set of tasks whose answers are known, on this machine, and a configuration that fails is filtered out before scoring (invariant 39) with the reason reported rather than being scored as the model the prior described. The check is cached by configuration and re-run when the model file, quantization or server flags change (§25.3).
+
 Every invariant maps to at least one automated test ID; see §32 and `docs/INVARIANT_TEST_MATRIX.md`.
 
 ---
@@ -924,11 +926,48 @@ figures could not finish 29 of 60 code tasks within a 3,072-token budget on an
 characters of answer. No leaderboard reports that, because it is not a property
 of the model — it is a property of this deployment.
 
-Fit is therefore a **hard constraint checked locally, not a score** (invariant
-39). The check is a single probe — does this model return an answer within the
-configured budget on this machine — measured in seconds, and its result filters
-the candidate before any weight is consulted. That is the only local
-measurement the harness requires of anyone.
+It is not only a matter of speed. The same measurement produced a second
+result: with a `q4_0` KV cache, a model that scores 46 of 60 scored **0 of 60**,
+answering a bare `from` inside a code fence in seven tokens and reporting
+`finish_reason: stop`. The same model with a `q8_0` cache scored 46 of 60 with
+52 of 60 answers byte-identical, eleven times faster. A user who quantizes the
+cache to fit their card can therefore turn a working model into a broken one,
+instantly and silently, and the published prior still says 78%.
+
+An earlier draft of this section called for a **fit probe**: does an answer come
+back within the configured budget. **That probe passes the broken
+configuration.** The q4 answer came back in 1.4 seconds. The probe measured
+whether the model was alive, not whether it was right.
+
+### 25.3 Configurations are proved, not assumed (invariant 44)
+
+So the local check is a **correctness smoke test**, not a liveness probe: a
+handful of tasks with known answers, seconds to run, and a configuration that
+fails them is filtered out before any weight is consulted (invariant 39).
+
+A smoke test is not a benchmark, and the difference is the whole point:
+
+| | answers | cost | who runs it |
+|---|---|---|---|
+| benchmark | how good is this model, relative to others | hours | nobody — declared from a prior (§25.1) |
+| smoke test | is this configuration broken, yes or no | seconds | the harness, automatically |
+
+Because it only asks whether a working model would obviously pass, it is
+indifferent to which model it is testing, which is what makes it safe to run on
+a setup the harness has never seen. Its tasks are trivial by construction and
+require no sandbox to check.
+
+It is cached by configuration — model file, quantization, and server flags —
+and re-run when any of those change, so the cost is paid once per setup rather
+than once per session.
+
+**What it deliberately does not catch.** A smoke test detects catastrophic
+breakage, not degradation. A configuration that has quietly cost seven points
+of accuracy passes it, and nothing in this harness will notice, because
+noticing would mean charging every user for the benchmark §25.1 just removed.
+That is an accepted risk and it is stated here rather than discovered later:
+**the harness knows when your model is broken. It does not know when your model
+is merely worse.**
 
 Do not build a large custom quick-suite in early releases. Start from small
 licensed/adapted task sets and real verified operational telemetry.
@@ -1237,6 +1276,7 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `SEC-020` a tool call cannot reach execution without a Permission Broker decision, and the decision is recorded;
 - `SEC-021` a child agent or task cannot hold a wider permission, privacy, egress or budget policy than its parent;
 - `ORCH-007` an online benchmark score is labelled as a prior and never reported as a local measurement;
+- `ORCH-008` a configuration that fails the smoke test is filtered out before scoring, and the result is cached by configuration;
 - `SEC-022` a model narrating a tool call it did not make fails the run instead of having its fabricated result reported as an answer;
 - `SEC-023` a literal credential in a config file is refused, and a malformed config file fails loudly rather than being skipped.
 
@@ -1301,6 +1341,8 @@ No release may contain an invariant without a test or an explicit documented exc
 **Removing an invariant is an explicit act.** Six invariants were lost between v2.1 and v2.2 — tool execution bypassing the permission broker, child-policy inheritance, memory scope isolation, and three about benchmark and scheduling honesty. None was argued down; the list was renumbered and they fell out. A tool that checks invariants against tests cannot catch this, because an invariant with no row has nothing to check.
 
 So an invariant leaves this document only by being moved to the Exceptions section with a reason, and the matrix carries a provenance column naming the revision each invariant came from.
+
+**Change of 2026-09-19 — the fit probe becomes a smoke test.** §25.2's probe asked whether an answer came back within budget. A measured `q4_0` KV cache failure returned a seven-token answer in 1.4 seconds and scored 0 of 60, so the probe passed a configuration that was completely broken. §25.3 replaces it with a correctness smoke test and invariant 44 requires it. Nothing is removed; a check that did not work is replaced by one that does, and §25.3 states plainly what it still cannot catch.
 
 **Change of 2026-09-18 — local measurement stops being a precondition.** §12 no longer requires an `established` local benchmark profile before a weight may be used, and §25 demotes the local benchmark suite to optional. This removes a requirement, not an invariant: 18, 25, 38, 39 and 40 are unchanged and 38 does more work than before, since priors are now the ordinary source of a weight rather than the weakest fallback. Two invariants were added rather than removed — 42 (a weight carries its provenance) and 43 (a council has a supervisor) — because making weights declarative creates a new way to be wrong quietly, and promoting the supervisor to a required role creates a new way to be overruled quietly. A future revision that renumbers the list can then be diffed against its predecessor rather than read for what it gained.
 

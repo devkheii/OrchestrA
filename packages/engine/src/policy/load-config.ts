@@ -36,6 +36,10 @@ export interface Settings {
   /** Binary that serves it. Defaults to `llama`. */
   llamaCommand?: string;
   contextSize?: number;
+  /** Extra server flags. Fingerprinted by the smoke test: `-ctk q4_0` lives here. */
+  llamaArgs?: readonly string[];
+  /** Run even when the configuration fails its smoke test (SPEC 25.3). */
+  skipSmokeTest?: boolean;
   allowRemote: boolean;
   security: SecurityConfig;
 }
@@ -86,6 +90,12 @@ export async function resolveSettings(options: LoadOptions): Promise<Settings> {
     allowRemote: merged["allowRemote"] === true,
     security,
   };
+
+  if (merged["skipSmokeTest"] === true) settings.skipSmokeTest = true;
+  const llamaArgs = merged["llamaArgs"];
+  if (Array.isArray(llamaArgs) && llamaArgs.every((a) => typeof a === "string")) {
+    settings.llamaArgs = llamaArgs as string[];
+  }
 
   const contextSize = merged["contextSize"];
   if (typeof contextSize === "number") settings.contextSize = contextSize;
