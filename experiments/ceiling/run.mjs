@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ALL, MODELS, LLAMA, PORT, SAMPLING } from "./models.mjs";
+import { ALL, MODELS, SETS, LLAMA, PORT, SAMPLING } from "./models.mjs";
 
 /**
  * Ask each model every task, batched by model.
@@ -13,20 +13,30 @@ import { ALL, MODELS, LLAMA, PORT, SAMPLING } from "./models.mjs";
  * cost two hours.
  */
 
-const OUT = "results";
+// Each run writes to its own directory. A later run must not overwrite the
+// answers an earlier report was computed from, or that report stops being
+// checkable.
+const OUT = process.env["DEM_RESULTS_DIR"] ?? "results";
 const TASKS = "data/tasks.jsonl";
 
 const tasks = readFileSync(TASKS, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
 mkdirSync(OUT, { recursive: true });
+console.log(`writing answers to ${OUT}`);
 
 // Named models, or run 1's pair when nothing is named. Naming them is how a
 // second run selects a different set without editing this file.
 const named = process.argv.slice(2).filter((a) => !a.startsWith("-"));
 const selected = named.length
-  ? named.map((key) => {
+  ? named.flatMap((key) => {
+      if (SETS[key]) return SETS[key];
       const model = ALL[key];
-      if (!model) throw new Error(`unknown model "${key}"; known: ${Object.keys(ALL).join(", ")}`);
-      return model;
+      if (!model) {
+        throw new Error(
+          `unknown model or set "${key}"; models: ${Object.keys(ALL).join(", ")}; ` +
+            `sets: ${Object.keys(SETS).join(", ")}`,
+        );
+      }
+      return [model];
     })
   : MODELS;
 

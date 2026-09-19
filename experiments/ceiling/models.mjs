@@ -116,3 +116,38 @@ export const PORT = 8099;
 
 /** Fixed so a re-run reproduces the same answers, and recorded in the results. */
 export const SAMPLING = { temperature: 0, top_p: 1, seed: 20260918 };
+
+/**
+ * Run 3's server configuration, measured rather than assumed.
+ *
+ * A q8_0 KV cache with flash attention scored 46/60 against fp16's 46/60 on
+ * the same model, with zero verdict flips and 52 of 60 answers byte-identical
+ * -- and eleven times faster, because the layers that were spilling to the CPU
+ * no longer have to. q4_0 is not the cheaper version of this: it scored 0/60.
+ */
+const KV8 = ["-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0"];
+
+const withKv8 = (model, overrides = {}) => ({ ...model, extraArgs: KV8, ...overrides });
+
+/**
+ * Run 3: all four models under one server configuration.
+ *
+ * Nothing is reused from run 2. The settings changed, and comparing answers
+ * produced under different settings invites exactly the objection this run
+ * exists to close -- that a difference between models was really a difference
+ * between configurations.
+ *
+ * Gemma gets 8x the budget because it is the only reasoning model here and run
+ * 1 established that 3,072 tokens truncates it on half the set. The comparison
+ * is between answers, not between token counts; what the extra budget costs in
+ * latency is reported separately.
+ */
+export const RUN3 = [
+  withKv8(ALL.qwen),
+  withKv8(ALL.deepseek),
+  withKv8(ALL.llama),
+  withKv8(ALL.gemma, { contextSize: 8192, maxTokens: 8192, gpuLayers: 999 }),
+];
+
+/** Named sets, so a run selects one without editing this file. */
+export const SETS = { run1: MODELS, run2: RUN2, run3: RUN3 };
