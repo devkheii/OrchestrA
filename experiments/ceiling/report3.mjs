@@ -133,6 +133,9 @@ for (let i = 0; i < RUN3.length; i++)
   for (let j = i + 1; j < RUN3.length; j++)
     pairs.push(analyse(RUN3[i], RUN3[j]));
 
+// Only a measured pair can be a candidate. llama+gemma reaches a ceiling of 6
+// on paper and is excluded here, which is the entire purpose of fixing the
+// validity conditions before seeing a number.
 const candidates = pairs.filter((p) => p.verdict === "CANDIDATE");
 
 let decision;
@@ -148,27 +151,66 @@ if (candidates.length === 0) {
 }
 
 // PREREG-3's correlation rule, applied rather than re-decided.
+//
+// The first branch requires EVERY pair, "including all three Gemma pairs", to
+// clear phi 0.35. An invalid pair does not clear anything -- it was not
+// measured -- so that branch cannot be taken while any pair is invalid,
+// however convenient its numbers look.
 const valid = pairs.filter((p) => p.valid);
+const invalid = pairs.filter((p) => !p.valid);
 const lowPhiCandidate = valid.find((p) => p.phi < 0.20 && p.ceiling >= 6);
 const lowPhiOnly = valid.find((p) => p.phi < 0.20 && p.ceiling < 6);
-const claim =
-  valid.length === 0
-    ? "No valid pair. Nothing may be claimed."
-    : lowPhiCandidate
-      ? `**Run 2's negative was pair-specific.** ${lowPhiCandidate.a.key}+${lowPhiCandidate.b.key} ` +
-        `fails nearly independently (phi ${lowPhiCandidate.phi.toFixed(2)}) and clears the threshold. ` +
-        `The council question reopens with that pair, under a new pre-registration.`
-      : valid.every((p) => p.phi >= 0.35)
-        ? "**The correlation belongs to the model class, not to a particular pair.** Every valid " +
-          "pair fails together well beyond chance, including every pair involving the reasoning " +
-          "model. Run 2's negative generalizes within this hardware class, and the objection that " +
-          "it was a fact about two specific models is answered."
-        : lowPhiOnly
-          ? `**Decorrelation is achievable and is not sufficient.** ` +
-            `${lowPhiOnly.a.key}+${lowPhiOnly.b.key} fails nearly independently (phi ` +
-            `${lowPhiOnly.phi.toFixed(2)}) yet the ceiling is ${lowPhiOnly.ceiling}, because the pair ` +
-            `is strength-mismatched. Both numbers reported; no generalization claimed.`
-          : "Mixed. No generalization is claimed.";
+
+let claim;
+if (valid.length === 0) {
+  claim = "No valid pair. Nothing may be claimed.";
+} else if (lowPhiCandidate) {
+  claim =
+    `**Run 2's negative was pair-specific.** ${lowPhiCandidate.a.key}+${lowPhiCandidate.b.key} ` +
+    `fails nearly independently (phi ${lowPhiCandidate.phi.toFixed(2)}) and clears the threshold. ` +
+    `The council question reopens with that pair, under a new pre-registration.`;
+} else if (invalid.length > 0) {
+  // The case this run actually landed in, and the one worth being careful
+  // about, because the invalid pairs are the ones with the encouraging numbers.
+  const unmeasured = [...new Set(invalid.flatMap((p) => [p.a, p.b]))]
+    .filter((m) => !modelValid(m.key))
+    .map((m) => m.key);
+  claim =
+    `**No generalization is claimed, because the model that would have tested it was not measured.**
+
+` +
+    `PREREG-3's first branch requires every pair -- explicitly including every pair involving the ` +
+    `reasoning model -- to clear phi 0.35. ${unmeasured.join(", ")} answered fewer than ${n - UNANSWERED_LIMIT} ` +
+    `of ${n} tasks, so its pairs were not measured and cannot clear anything.
+
+` +
+    `What run 3 does establish: the ${valid.length} valid pairs reproduce run 2 under a single ` +
+    `server configuration, with ceilings of ${valid.map((p) => p.ceiling).join(", ")} and phi of ` +
+    `${valid.map((p) => p.phi.toFixed(2)).join(", ")}. The objection that run 2 measured a ` +
+    `configuration difference rather than a model difference is answered. The objection that it ` +
+    `measured one kind of model is not.
+
+` +
+    `**The invalid pairs show lower phi, and that is what missing data looks like, not what ` +
+    `decorrelation looks like.** A truncated answer is scored as a failure, and those failures land ` +
+    `on tasks unrelated to where the other model fails, which mechanically pushes phi down and the ` +
+    `ceiling up. The blind-spot figures below say the same thing from the other side: most of the ` +
+    `stronger model's failures were never attempted. Those numbers are not evidence of anything ` +
+    `and are reported only so that nobody recovers them later as if they were.`;
+} else if (valid.every((p) => p.phi >= 0.35)) {
+  claim =
+    "**The correlation belongs to the model class, not to a particular pair.** Every pair fails " +
+    "together well beyond chance. Run 2's negative generalizes within this hardware class, and the " +
+    "objection that it was a fact about two specific models is answered.";
+} else if (lowPhiOnly) {
+  claim =
+    `**Decorrelation is achievable and is not sufficient.** ` +
+    `${lowPhiOnly.a.key}+${lowPhiOnly.b.key} fails nearly independently (phi ` +
+    `${lowPhiOnly.phi.toFixed(2)}) yet the ceiling is ${lowPhiOnly.ceiling}, because the pair is ` +
+    `strength-mismatched. Both numbers reported; no generalization claimed.`;
+} else {
+  claim = "Mixed. No generalization is claimed.";
+}
 
 const pct = (k) => ((k / n) * 100).toFixed(1) + "%";
 const mins = (k) => (latency.get(k) / 60000).toFixed(0);
