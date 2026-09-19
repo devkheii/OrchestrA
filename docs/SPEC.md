@@ -92,6 +92,8 @@ The core differentiation is:
 
 44. **A model configuration is proved working before it is trusted.** A published prior describes a model; a weight and a council seat are given to a *deployment*. Before a configured model carries either, it answers a small set of tasks whose answers are known, on this machine, and a configuration that fails is filtered out before scoring (invariant 39) with the reason reported rather than being scored as the model the prior described. The check is cached by configuration and re-run when the model file, quantization or server flags change (§25.3).
 
+45. **A stream that stops is not a stream that finished.** A model response without an explicit end — a terminating frame or a stated finish reason — is an incomplete response, and is surfaced as an error naming what was received rather than delivered as a short answer. A server that dies mid-generation closes the connection instead of reporting a failure; recording that as a completed answer attributes the server's silence to the model (§25.4).
+
 Every invariant maps to at least one automated test ID; see §32 and `docs/INVARIANT_TEST_MATRIX.md`.
 
 ---
@@ -969,6 +971,38 @@ That is an accepted risk and it is stated here rather than discovered later:
 **the harness knows when your model is broken. It does not know when your model
 is merely worse.**
 
+**And it does not catch a configuration that breaks under load.** The smoke
+test's questions are trivial, so their answers are short, so the context never
+fills. A configuration that loads, answers `17 + 25` correctly, and then runs
+out of memory once a real generation fills the KV cache passes every question
+it is asked.
+
+That was measured too: with every layer forced onto an 8GB card at an 8,192
+token context, a model answered one task in 96 seconds, died during the second,
+and then stayed bound to its port answering 57 more requests in under 200ms
+each with nothing in them.
+
+The answer to this is **not** a bigger smoke test — a check large enough to fill
+a context is a benchmark, and §25.1 exists to not have one. It is detection at
+runtime, which is invariant 45.
+
+### 25.4 A stream that stops is not a stream that finished (invariant 45)
+
+A model server that dies mid-generation does not report an error. It closes the
+connection. Without an explicit end — a terminating frame or a stated finish
+reason — what arrives is indistinguishable from a model that had little to say,
+and the harness must not resolve the difference in the model's favour.
+
+So an incomplete stream is an infrastructure failure, surfaced as an error
+naming what was received. Recording it as a completed answer attributes a dead
+server's silence to the model, which is the same fabrication invariant 41
+forbids in the other direction: there, a model's narration is not an action;
+here, a server's silence is not an answer.
+
+This is also why a run that spans many requests must not treat such a result as
+data. Fifty-seven empty answers scored as wrong answers would have been
+reported as a model's failure rate.
+
 Do not build a large custom quick-suite in early releases. Start from small
 licensed/adapted task sets and real verified operational telemetry.
 
@@ -1277,6 +1311,7 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `SEC-021` a child agent or task cannot hold a wider permission, privacy, egress or budget policy than its parent;
 - `ORCH-007` an online benchmark score is labelled as a prior and never reported as a local measurement;
 - `ORCH-008` a configuration that fails the smoke test is filtered out before scoring, and the result is cached by configuration;
+- `SEC-024` a stream ending without a terminating frame or finish reason is reported as an error, not as a completed answer;
 - `SEC-022` a model narrating a tool call it did not make fails the run instead of having its fabricated result reported as an answer;
 - `SEC-023` a literal credential in a config file is refused, and a malformed config file fails loudly rather than being skipped.
 
@@ -1341,6 +1376,8 @@ No release may contain an invariant without a test or an explicit documented exc
 **Removing an invariant is an explicit act.** Six invariants were lost between v2.1 and v2.2 — tool execution bypassing the permission broker, child-policy inheritance, memory scope isolation, and three about benchmark and scheduling honesty. None was argued down; the list was renumbered and they fell out. A tool that checks invariants against tests cannot catch this, because an invariant with no row has nothing to check.
 
 So an invariant leaves this document only by being moved to the Exceptions section with a reason, and the matrix carries a provenance column naming the revision each invariant came from.
+
+**Change of 2026-09-19 — an unfinished stream stops counting as an answer.** Invariant 45 and §25.4 were added after a model server died mid-generation and then answered 57 further requests with nothing in them, none of which raised. The same measurement showed the limit of the smoke test invariant 44 had just introduced, so §25.3 now states that limit rather than leaving it to be found. A bigger smoke test is the wrong answer to it.
 
 **Change of 2026-09-19 — the fit probe becomes a smoke test.** §25.2's probe asked whether an answer came back within budget. A measured `q4_0` KV cache failure returned a seven-token answer in 1.4 seconds and scored 0 of 60, so the probe passed a configuration that was completely broken. §25.3 replaces it with a correctness smoke test and invariant 44 requires it. Nothing is removed; a check that did not work is replaced by one that does, and §25.3 states plainly what it still cannot catch.
 

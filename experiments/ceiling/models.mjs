@@ -146,7 +146,12 @@ export const RUN3 = [
   withKv8(ALL.qwen),
   withKv8(ALL.deepseek),
   withKv8(ALL.llama),
-  withKv8(ALL.gemma, { contextSize: 8192, maxTokens: 8192, gpuLayers: 999 }),
+  // -ngl -1, not 999. At 8192 context with every layer forced onto the card,
+  // the server loads, answers a short probe, and then dies once a real
+  // generation fills the KV cache -- it managed one task before taking the
+  // rest of the run down with it. Auto-fit is 10.8 tok/s against 13.9 and
+  // survives, which is the better trade for a measurement.
+  withKv8(ALL.gemma, { contextSize: 8192, maxTokens: 8192, gpuLayers: -1 }),
 ];
 
 /** Named sets, so a run selects one without editing this file. */

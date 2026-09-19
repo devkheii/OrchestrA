@@ -125,7 +125,11 @@ describe("Terminal: bounded and redacted, because a model reads this", () => {
     } finally {
       manager.stopAll();
     }
-  });
+    // Spawning a PTY and draining 2,000 lines through it is not fast, and the
+    // assertion is about the scrollback cap rather than the clock. Under vitest's
+    // 5s default this passed alone and failed in a full parallel run, which is
+    // the shape of a test that would fail in CI for no reason anyone could act on.
+  }, 30_000);
 
   it("keeps the most recent output when it truncates", async () => {
     // A terminal that drops the newest lines is worse than useless: the model

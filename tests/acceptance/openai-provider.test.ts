@@ -208,3 +208,81 @@ describe("OpenAI-compatible provider: a refused connection explains itself", () 
     expect(message).not.toContain("llama serve");
   });
 });
+
+describe("SEC-024: a stream that stops is not a stream that finished (invariant 45)", () => {
+  /**
+   * Found in the experiment, not by review. A local model server died
+   * mid-generation: it emitted 5,381 characters of reasoning, produced no
+   * answer, and closed the connection without `[DONE]` and without a
+   * `finish_reason`. It then stayed bound to its port and answered 57 more
+   * requests in under 200ms each with nothing in them.
+   *
+   * Nothing raised. Every one of those was recorded as a successful empty
+   * answer, and the model would have been reported as getting 57 tasks wrong.
+   *
+   * A truncated stream is an infrastructure failure and has to read as one,
+   * because the alternative is attributing a dead server's silence to the
+   * model (invariant 41 draws the same line for a different fabrication).
+   */
+  it("reports an error when the connection closes before any finish reason", async () => {
+    const endpoint = await startFakeOpenAI({
+      rawLines: [`data: ${JSON.stringify(delta("def solve():"))}`],
+    });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: endpoint.url, model: "m" });
+      const events = await collect(provider.run({ messages: [{ role: "user", content: "hi" }] }));
+
+      expect(events.some((e) => e.type === "error")).toBe(true);
+      expect(events.some((e) => e.type === "done" && e.reason === "stop")).toBe(false);
+    } finally {
+      await endpoint.close();
+    }
+  });
+
+  it("names what it received, so a dead server is distinguishable from a quiet model", async () => {
+    const endpoint = await startFakeOpenAI({ rawLines: [] });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: endpoint.url, model: "m" });
+      const events = await collect(provider.run({ messages: [{ role: "user", content: "hi" }] }));
+      const error = events.find((e) => e.type === "error");
+
+      expect(error).toBeDefined();
+      expect((error as { message: string }).message).toMatch(/without|incomplete|ended/i);
+    } finally {
+      await endpoint.close();
+    }
+  });
+
+  it("still accepts a stream that ends with [DONE] and no explicit finish_reason", async () => {
+    // Some servers send [DONE] without ever setting finish_reason. That is a
+    // complete answer, and refusing it would break working endpoints.
+    const endpoint = await startFakeOpenAI({ frames: [delta("hello")] });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: endpoint.url, model: "m" });
+      const events = await collect(provider.run({ messages: [{ role: "user", content: "hi" }] }));
+
+      expect(events.some((e) => e.type === "error")).toBe(false);
+      expect(events.at(-1)).toEqual({ type: "done", reason: "stop" });
+    } finally {
+      await endpoint.close();
+    }
+  });
+
+  it("still accepts a stream that ends on finish_reason without [DONE]", async () => {
+    const endpoint = await startFakeOpenAI({
+      rawLines: [
+        `data: ${JSON.stringify(delta("hello"))}`,
+        `data: ${JSON.stringify(finish("stop"))}`,
+      ],
+    });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: endpoint.url, model: "m" });
+      const events = await collect(provider.run({ messages: [{ role: "user", content: "hi" }] }));
+
+      expect(events.some((e) => e.type === "error")).toBe(false);
+      expect(events.at(-1)).toEqual({ type: "done", reason: "stop" });
+    } finally {
+      await endpoint.close();
+    }
+  });
+});

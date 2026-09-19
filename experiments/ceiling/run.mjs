@@ -159,6 +159,18 @@ async function ask(model, prompt) {
     }
   }
 
+  // A stream that ended without a `done` frame did not finish, whatever it
+  // managed to emit first. The server died mid-generation on one task and then
+  // answered 57 more in under 200ms with nothing in them; none of that raised,
+  // so every one was recorded as a valid empty answer and would have been
+  // graded as 57 wrong answers from the model.
+  if (finish === null) {
+    throw new Error(
+      `stream ended without a finish reason after ${answer.length} answer chars ` +
+        `and ${reasoning.length} reasoning chars - the server most likely died`,
+    );
+  }
+
   return { answer, reasoning: reasoning || null, finish, usage };
 }
 

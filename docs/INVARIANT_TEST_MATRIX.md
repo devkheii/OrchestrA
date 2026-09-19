@@ -47,6 +47,7 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 42 | A weight carries its provenance; an undeclared weight is equal weight | `DEC-015` | council, benchmark | deferred (v0.2-alpha) — added 2026-09-18 with the move to declared weights |
 | 43 | A council always has a designated supervisor | `DEC-016` | council | deferred (v0.2-alpha) — added 2026-09-18; supervisor promoted from optional mode to required role |
 | 44 | A model configuration is proved working before it is trusted | `ORCH-008` | policy, benchmark | added 2026-09-19 after a measured `q4_0` KV cache scored 0/60 while answering in 1.4s |
+| 45 | A stream that stops is not a stream that finished | `SEC-024` | adapters | green — added 2026-09-19 after a server died mid-generation and answered 57 further requests with nothing in them |
 | 31 | Model-authored code runs only in a healthy sandbox, never against the live workspace | `SEC-009`, `SEC-010`, `SEC-011`, `SEC-012` | counterexample, runtime | deferred (v0.2-alpha) |
 
 Note on #21: the invariant is testable in v0.1 even though the sandbox adapter is absent. The v0.1 assertion is the negative one — with no sandbox present, AUTO and FULL_ACCESS must be unselectable. The positive case (healthy sandbox enables AUTO) is added in v0.2-alpha.

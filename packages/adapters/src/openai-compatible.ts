@@ -137,6 +137,22 @@ export class OpenAICompatibleProvider implements Provider {
     }
 
     let reason: "stop" | "length" | "cancelled" = "stop";
+
+    // Did the server say it was done, or did it just stop talking?
+    //
+    // A local model server died mid-generation during the efficacy experiment:
+    // it emitted 5,381 characters of reasoning, no answer, and closed the
+    // connection with neither `[DONE]` nor a `finish_reason`. It then stayed
+    // bound to its port and answered 57 more requests in under 200ms with
+    // nothing in them. None of it raised, so all 57 read as successful empty
+    // answers — which is a dead server's silence attributed to the model.
+    let finished = false;
+
+    // What was received before the stream stopped, so the two cases a user has
+    // to tell apart — a server that died and a model with nothing to say —
+    // look different in the error.
+    let answerChars = 0;
+    let rationaleChars = 0;
     // Tool arguments arrive as partial JSON across frames, so a call is only
     // whole once the stream ends. Emitting early would hand the loop a
     // half-parsed object it would have to guess at.
@@ -144,7 +160,10 @@ export class OpenAICompatibleProvider implements Provider {
 
     try {
       for await (const payload of sseFrames(response.body, signal)) {
-        if (payload === "[DONE]") break;
+        if (payload === "[DONE]") {
+          finished = true;
+          break;
+        }
 
         let frame: ChatFrame;
         try {
@@ -161,10 +180,16 @@ export class OpenAICompatibleProvider implements Provider {
         // Rationale first, so a consumer rendering in order shows the model's
         // reasoning before the conclusion it led to.
         const rationale = rationaleOf(choice.delta);
-        if (rationale) yield { type: "rationale", text: rationale };
+        if (rationale) {
+          rationaleChars += rationale.length;
+          yield { type: "rationale", text: rationale };
+        }
 
         const text = contentOf(choice.delta);
-        if (text) yield { type: "delta", text };
+        if (text) {
+          answerChars += text.length;
+          yield { type: "delta", text };
+        }
 
         for (const part of choice.delta?.["tool_calls"] as WireToolCall[] | undefined ?? []) {
           const slot = pending.get(part.index) ?? { id: "", name: "", args: "" };
@@ -174,7 +199,12 @@ export class OpenAICompatibleProvider implements Provider {
           pending.set(part.index, slot);
         }
 
-        if (choice.finish_reason === "length") reason = "length";
+        if (choice.finish_reason) {
+          // Some servers close after this without sending [DONE]; that is a
+          // complete answer and refusing it would break working endpoints.
+          finished = true;
+          if (choice.finish_reason === "length") reason = "length";
+        }
       }
     } catch (err) {
       if (signal?.aborted) {
@@ -203,6 +233,18 @@ export class OpenAICompatibleProvider implements Provider {
         type: "tool_call",
         call: { id: slot.id || `call_${index}`, name: slot.name, arguments: args },
       };
+    }
+
+    if (!finished && !signal?.aborted) {
+      yield {
+        type: "error",
+        message:
+          `the model server ended the stream without finishing it, after ` +
+          `${answerChars} characters of answer and ${rationaleChars} of reasoning. ` +
+          `It most likely died mid-generation — a configuration that loads and ` +
+          `answers a short prompt can still run out of memory once the context fills.`,
+      };
+      return;
     }
 
     yield { type: "done", reason: signal?.aborted ? "cancelled" : reason };
