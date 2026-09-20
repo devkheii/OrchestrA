@@ -1,0 +1,300 @@
+{"id":"bb_6592","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":63,"completion_tokens":2},"ms":264}
+{"id":"sfq_3372","answer":"Pierre-Auguste Renoir","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":71,"completion_tokens":6},"ms":552}
+{"id":"bb_7368","answer":"Women's Royal Naval Service","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":69,"completion_tokens":6},"ms":592}
+{"id":"bb_7851","answer":"1967","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":66,"completion_tokens":5},"ms":404}
+{"id":"qf_1973","answer":"Black","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":65,"completion_tokens":2},"ms":308}
+{"id":"wh_2365","answer":"Charles II","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":75,"completion_tokens":3},"ms":363}
+{"id":"bb_7851","answer":"1967","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":66,"completion_tokens":5},"ms":403}
+{"id":"bb_8199","answer":"Spike","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":67,"completion_tokens":3},"ms":404}
+{"id":"qf_1226","answer":"7","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":64,"completion_tokens":2},"ms":306}
+{"id":"qf_1555","answer":"Brain","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":63,"completion_tokens":2},"ms":308}
+{"id":"wh_1933","answer":"Ray Kroc","reasoning":null,"finish":"stop","usage":{"prompt_tokens":82,"total_tokens":86,"completion_tokens":4},"ms":463}
+{"id":"bb_6943","answer":"hip","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":70,"completion_tokens":2},"ms":361}
+{"id":"sfq_3015","answer":"Massachusetts","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":61,"completion_tokens":3},"ms":308}
+{"id":"wh_1736","answer":"Jonathan Demme","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":69,"completion_tokens":4},"ms":457}
+{"id":"wh_2695","answer":"Snakes","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":307}
+{"id":"wh_1985","answer":"Madagascar","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":65,"completion_tokens":3},"ms":311}
+{"id":"bb_6480","answer":"Glycerol","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":74,"completion_tokens":4},"ms":459}
+{"id":"wh_2395","answer":"Nantwich","reasoning":null,"finish":"stop","usage":{"prompt_tokens":74,"total_tokens":78,"completion_tokens":4},"ms":460}
+{"id":"bb_7675","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":69,"total_tokens":71,"completion_tokens":2},"ms":363}
+{"id":"bb_6913","answer":"Waterloo","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":66,"completion_tokens":3},"ms":310}
+{"id":"bb_7968","answer":"Armpit","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":403}
+{"id":"sfq_3721","answer":"Bratislava","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":66,"completion_tokens":4},"ms":407}
+{"id":"bb_7298","answer":"Ichak Adizes","reasoning":null,"finish":"stop","usage":{"prompt_tokens":76,"total_tokens":81,"completion_tokens":5},"ms":652}
+{"id":"wh_2109","answer":"Berkelium","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":70,"completion_tokens":5},"ms":459}
+{"id":"bb_8093","answer":"Tate Donovan","reasoning":null,"finish":"stop","usage":{"prompt_tokens":69,"total_tokens":73,"completion_tokens":4},"ms":552}
+{"id":"jp_4151","answer":"Detroit","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":63,"completion_tokens":2},"ms":308}
+{"id":"jp_4426","answer":"Miami","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":59,"completion_tokens":2},"ms":307}
+{"id":"bb_6583","answer":"3","reasoning":null,"finish":"stop","usage":{"prompt_tokens":56,"total_tokens":58,"completion_tokens":2},"ms":310}
+{"id":"sfq_3395","answer":"Berlin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":65,"completion_tokens":2},"ms":309}
+{"id":"bb_7353","answer":"Khartoum","reasoning":null,"finish":"stop","usage":{"prompt_tokens":71,"total_tokens":76,"completion_tokens":5},"ms":458}
+{"id":"sfq_342","answer":"Down the rabbit hole","reasoning":null,"finish":"stop","usage":{"prompt_tokens":55,"total_tokens":60,"completion_tokens":5},"ms":500}
+{"id":"qf_1447","answer":"South Dakota","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":311}
+{"id":"jp_4235","answer":"Route 66","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":64,"completion_tokens":5},"ms":401}
+{"id":"sfq_2718","answer":"Conductivity","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":70,"completion_tokens":4},"ms":461}
+{"id":"bb_8079","answer":"Carbon","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":59,"completion_tokens":2},"ms":310}
+{"id":"wh_1653","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":71,"total_tokens":73,"completion_tokens":2},"ms":363}
+{"id":"wh_2009","answer":"Saint Columba","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":74,"completion_tokens":4},"ms":461}
+{"id":"bb_7289","answer":"Sting","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":65,"completion_tokens":3},"ms":402}
+{"id":"sfq_3627","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":82,"total_tokens":84,"completion_tokens":2},"ms":368}
+{"id":"sfq_93","answer":"Jack Lemmon","reasoning":null,"finish":"stop","usage":{"prompt_tokens":85,"total_tokens":89,"completion_tokens":4},"ms":467}
+{"id":"sfq_3110","answer":"Mumbai","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":62,"completion_tokens":3},"ms":308}
+{"id":"wh_2521","answer":"Blue","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":62,"completion_tokens":2},"ms":310}
+{"id":"bb_7450","answer":"Mason Williams","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":64,"completion_tokens":4},"ms":503}
+{"id":"bb_7194","answer":"815","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":74,"completion_tokens":4},"ms":461}
+{"id":"sfq_472","answer":"Sebastian Coe","reasoning":null,"finish":"stop","usage":{"prompt_tokens":86,"total_tokens":91,"completion_tokens":5},"ms":465}
+{"id":"bb_7425","answer":"Joni","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":71,"completion_tokens":3},"ms":365}
+{"id":"wh_2442","answer":"The Black Eyed Peas","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":75,"completion_tokens":7},"ms":552}
+{"id":"jp_4544","answer":"Mackinac Bridge","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":65,"completion_tokens":6},"ms":496}
+{"id":"qf_1321","answer":"Vodka","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":309}
+{"id":"jp_4508","answer":"Yosemite National Park","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":63,"completion_tokens":5},"ms":404}
+{"id":"bb_7609","answer":"Conclave","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":68,"completion_tokens":3},"ms":362}
+{"id":"sfq_441","answer":"1845","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":64,"completion_tokens":5},"ms":406}
+{"id":"qf_1650","answer":"Tommy Vance","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":69,"completion_tokens":4},"ms":458}
+{"id":"bb_7221","answer":"Brooklands","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":406}
+{"id":"wh_2094","answer":"The Call of the Wild","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":70,"completion_tokens":6},"ms":502}
+{"id":"sfq_2902","answer":"The Strand","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":61,"completion_tokens":3},"ms":308}
+{"id":"bb_7470","answer":"Paul Anka","reasoning":null,"finish":"stop","usage":{"prompt_tokens":75,"total_tokens":79,"completion_tokens":4},"ms":462}
+{"id":"bb_7071","answer":"Woad","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":308}
+{"id":"qf_1890","answer":"Chantilly","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":69,"completion_tokens":4},"ms":457}
+{"id":"bb_7757","answer":"Mercury","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":66,"completion_tokens":3},"ms":312}
+{"id":"wh_2368","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":65,"completion_tokens":2},"ms":312}
+{"id":"bb_7976","answer":"E","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":65,"completion_tokens":2},"ms":309}
+{"id":"sfq_3823","answer":"Charing Cross","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":403}
+{"id":"bb_6646","answer":"Thomas Becket","reasoning":null,"finish":"stop","usage":{"prompt_tokens":74,"total_tokens":78,"completion_tokens":4},"ms":461}
+{"id":"sfq_2714","answer":"Robert Burns","reasoning":null,"finish":"stop","usage":{"prompt_tokens":69,"total_tokens":72,"completion_tokens":3},"ms":367}
+{"id":"jp_4137","answer":"The House of the Rising Sun","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":70,"completion_tokens":7},"ms":503}
+{"id":"bb_7437","answer":"Jane Birkin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":67,"completion_tokens":4},"ms":406}
+{"id":"qf_1696","answer":"Tanzania","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":74,"completion_tokens":4},"ms":459}
+{"id":"wh_2660","answer":"May","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":64,"completion_tokens":2},"ms":314}
+{"id":"qf_1987","answer":"Carburetor","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":64,"completion_tokens":5},"ms":404}
+{"id":"jp_4308","answer":"Cuba","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":69,"completion_tokens":3},"ms":364}
+{"id":"sfq_3503","answer":"Epsilon Indi","reasoning":null,"finish":"stop","usage":{"prompt_tokens":74,"total_tokens":78,"completion_tokens":4},"ms":461}
+{"id":"sfq_223","answer":"Surrealism","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":68,"completion_tokens":4},"ms":407}
+{"id":"sfq_3346","answer":"Czech Republic","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":64,"completion_tokens":4},"ms":407}
+{"id":"sfq_3490","answer":"Leeds Rhinos","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":64,"completion_tokens":5},"ms":409}
+{"id":"bb_7225","answer":"Fallopian tube","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":68,"completion_tokens":5},"ms":429}
+{"id":"sfq_3509","answer":"8","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":66,"completion_tokens":2},"ms":320}
+{"id":"wh_2485","answer":"Vitamin C","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":69,"completion_tokens":4},"ms":614}
+{"id":"sfq_2934","answer":"Rugby","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":407}
+{"id":"qf_1884","answer":"Jill","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":68,"completion_tokens":3},"ms":364}
+{"id":"qf_1216","answer":"Snow White and the Seven Dwarfs","reasoning":null,"finish":"stop","usage":{"prompt_tokens":56,"total_tokens":65,"completion_tokens":9},"ms":595}
+{"id":"sfq_486","answer":"Miley Cyrus","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":68,"completion_tokens":4},"ms":404}
+{"id":"wh_2083","answer":" Frida Kahlo","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":64,"completion_tokens":5},"ms":408}
+{"id":"jp_4355","answer":"Nasdaq","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":76,"completion_tokens":4},"ms":459}
+{"id":"qf_1632","answer":"1955","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":65,"completion_tokens":5},"ms":404}
+{"id":"wh_1763","answer":"Backgammon","reasoning":null,"finish":"stop","usage":{"prompt_tokens":78,"total_tokens":82,"completion_tokens":4},"ms":458}
+{"id":"qf_1667","answer":"Australia","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":63,"completion_tokens":2},"ms":311}
+{"id":"bb_7262","answer":"Pig","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":309}
+{"id":"qf_1931","answer":"Midnight Cowboy","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":69,"completion_tokens":4},"ms":459}
+{"id":"bb_6336","answer":"Ireland","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":71,"completion_tokens":3},"ms":364}
+{"id":"sfq_3130","answer":"Sarajevo","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":76,"completion_tokens":4},"ms":463}
+{"id":"wh_2605","answer":"Heriot-Watt University","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":73,"completion_tokens":6},"ms":555}
+{"id":"qf_1044","answer":"1920","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":71,"completion_tokens":5},"ms":462}
+{"id":"bb_6777","answer":"Elements","reasoning":null,"finish":"stop","usage":{"prompt_tokens":76,"total_tokens":78,"completion_tokens":2},"ms":365}
+{"id":"wh_2692","answer":"Mae West","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":406}
+{"id":"qf_1389","answer":"Silk weaver","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":63,"completion_tokens":5},"ms":404}
+{"id":"wh_2204","answer":"Paddy Ashdown","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":63,"completion_tokens":5},"ms":409}
+{"id":"wh_2215","answer":"Boris Yeltsin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":64,"completion_tokens":6},"ms":500}
+{"id":"jp_4375","answer":"Yosemite National Park","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":69,"completion_tokens":5},"ms":404}
+{"id":"sfq_3663","answer":"Abu Dhabi","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":62,"completion_tokens":4},"ms":404}
+{"id":"qf_944","answer":"Basketball","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":65,"completion_tokens":3},"ms":310}
+{"id":"qf_1483","answer":"Mayflower","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":67,"completion_tokens":3},"ms":311}
+{"id":"qf_1138","answer":"Winnipeg","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":68,"completion_tokens":4},"ms":406}
+{"id":"bb_8190","answer":"Valéry Giscard d'Estaing","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":73,"completion_tokens":9},"ms":599}
+{"id":"sfq_2769","answer":"Sparks","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":69,"completion_tokens":3},"ms":458}
+{"id":"sfq_3201","answer":"The King and I","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":71,"completion_tokens":5},"ms":555}
+{"id":"jp_4424","answer":"Lake Champlain","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":66,"completion_tokens":4},"ms":407}
+{"id":"sfq_2","answer":"Richard D'Oyly Carte","reasoning":null,"finish":"stop","usage":{"prompt_tokens":71,"total_tokens":78,"completion_tokens":7},"ms":652}
+{"id":"sfq_3202","answer":"Chinook","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":66,"completion_tokens":4},"ms":406}
+{"id":"sfq_13","answer":"ate the malt","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":70,"completion_tokens":4},"ms":461}
+{"id":"bb_7143","answer":"Moses","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":310}
+{"id":"sfq_3798","answer":"Hooghly","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":64,"completion_tokens":4},"ms":405}
+{"id":"bb_7608","answer":"Plato","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":66,"completion_tokens":3},"ms":309}
+{"id":"wh_1908","answer":"Georges Braque","reasoning":null,"finish":"stop","usage":{"prompt_tokens":100,"total_tokens":105,"completion_tokens":5},"ms":473}
+{"id":"qf_1633","answer":"The Antique Dealers","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":72,"completion_tokens":4},"ms":462}
+{"id":"sfq_234","answer":"Geraldine Ferraro","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":73,"completion_tokens":6},"ms":555}
+{"id":"qf_1269","answer":"Smithfield","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":60,"completion_tokens":3},"ms":309}
+{"id":"bb_6852","answer":"Richard Nixon","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":309}
+{"id":"bb_6664","answer":"Human motivation","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":311}
+{"id":"wh_2629","answer":"Mole","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":70,"completion_tokens":3},"ms":366}
+{"id":"bb_7737","answer":"1912","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":64,"completion_tokens":5},"ms":404}
+{"id":"sfq_161","answer":"Sector","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":74,"completion_tokens":2},"ms":368}
+{"id":"bb_6314","answer":"25","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":312}
+{"id":"bb_7096","answer":"Fianna Fáil","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":70,"completion_tokens":5},"ms":459}
+{"id":"sfq_634","answer":"bitter almonds","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":66,"completion_tokens":4},"ms":407}
+{"id":"bb_7728","answer":"Hugh Laurie","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":70,"completion_tokens":3},"ms":363}
+{"id":"sfq_2995","answer":"Berlin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":65,"completion_tokens":2},"ms":311}
+{"id":"bb_7756","answer":"10","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":75,"completion_tokens":3},"ms":365}
+{"id":"wh_2671","answer":"Hemlock","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":67,"completion_tokens":4},"ms":408}
+{"id":"sfq_298","answer":"Kent","reasoning":null,"finish":"stop","usage":{"prompt_tokens":79,"total_tokens":81,"completion_tokens":2},"ms":370}
+{"id":"qf_1245","answer":"Colorado River","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":62,"completion_tokens":3},"ms":310}
+{"id":"qf_995","answer":"Tibia","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":60,"completion_tokens":3},"ms":406}
+{"id":"sfq_3463","answer":"Venice","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":69,"completion_tokens":3},"ms":364}
+{"id":"sfq_3811","answer":"Madonna","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":71,"completion_tokens":3},"ms":365}
+{"id":"qf_2140","answer":"Belgium","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":310}
+{"id":"bb_6630","answer":"France","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":61,"completion_tokens":2},"ms":309}
+{"id":"sfq_392","answer":"Stern","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":75,"completion_tokens":3},"ms":365}
+{"id":"bb_7532","answer":"George Michael","reasoning":null,"finish":"stop","usage":{"prompt_tokens":76,"total_tokens":79,"completion_tokens":3},"ms":369}
+{"id":"wh_2594","answer":"James Cameron","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":67,"completion_tokens":3},"ms":312}
+{"id":"sfq_19","answer":"Crete","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":73,"completion_tokens":3},"ms":363}
+{"id":"bb_8443","answer":"Eartha Kitt","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":76,"completion_tokens":4},"ms":462}
+{"id":"bb_7279","answer":"John of Gaunt","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":66,"completion_tokens":5},"ms":501}
+{"id":"wh_1982","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":72,"completion_tokens":2},"ms":365}
+{"id":"qf_1638","answer":"Herbert Lom","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":70,"completion_tokens":5},"ms":462}
+{"id":"bb_7188","answer":"Estonia","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":62,"completion_tokens":4},"ms":405}
+{"id":"bb_6465","answer":"Par","reasoning":null,"finish":"stop","usage":{"prompt_tokens":74,"total_tokens":76,"completion_tokens":2},"ms":365}
+{"id":"wh_2663","answer":"Andriy Shevchenko","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":72,"completion_tokens":8},"ms":599}
+{"id":"wh_2003","answer":"Imola","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":71,"completion_tokens":3},"ms":365}
+{"id":"qf_1204","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":61,"completion_tokens":2},"ms":308}
+{"id":"qf_2073","answer":"Pear","reasoning":null,"finish":"stop","usage":{"prompt_tokens":56,"total_tokens":58,"completion_tokens":2},"ms":308}
+{"id":"wh_2296","answer":"Autobahn","reasoning":null,"finish":"stop","usage":{"prompt_tokens":56,"total_tokens":60,"completion_tokens":4},"ms":407}
+{"id":"sfq_3764","answer":"Usk","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":62,"completion_tokens":3},"ms":403}
+{"id":"bb_7724","answer":"Albatross","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":404}
+{"id":"jp_4277","answer":"It","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":62,"completion_tokens":2},"ms":308}
+{"id":"bb_7364","answer":"Al Gore","reasoning":null,"finish":"stop","usage":{"prompt_tokens":73,"total_tokens":76,"completion_tokens":3},"ms":367}
+{"id":"qf_1758","answer":"Tommy Vance","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":407}
+{"id":"wh_1698","answer":"Middlesbrough","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":68,"completion_tokens":5},"ms":407}
+{"id":"wh_1906","answer":"Meninges","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":404}
+{"id":"bb_7130","answer":"Pennsylvania","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":73,"completion_tokens":3},"ms":382}
+{"id":"qf_1010","answer":"Tim Pigott-Cottis","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":70,"completion_tokens":7},"ms":753}
+{"id":"sfq_3339","answer":"Rita Hayworth","reasoning":null,"finish":"stop","usage":{"prompt_tokens":71,"total_tokens":76,"completion_tokens":5},"ms":581}
+{"id":"bb_7700","answer":"Victor Hugo","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":69,"completion_tokens":4},"ms":458}
+{"id":"bb_7518","answer":"Montpelier","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":61,"completion_tokens":4},"ms":403}
+{"id":"sfq_250","answer":"Danish","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":309}
+{"id":"wh_2456","answer":"Concorde","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":70,"completion_tokens":4},"ms":458}
+{"id":"sfq_2748","answer":"The French Connection","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":71,"completion_tokens":4},"ms":461}
+{"id":"sfq_2728","answer":"George Gilbert Scott","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":403}
+{"id":"bb_6701","answer":"5","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":70,"completion_tokens":2},"ms":367}
+{"id":"sfq_80","answer":"Sally Berman","reasoning":null,"finish":"stop","usage":{"prompt_tokens":71,"total_tokens":76,"completion_tokens":5},"ms":557}
+{"id":"jp_4206","answer":"Valhalla","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":66,"completion_tokens":4},"ms":409}
+{"id":"qf_1704","answer":"Percy Spencer","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":65,"completion_tokens":5},"ms":405}
+{"id":"wh_2190","answer":"Strait of Messina","reasoning":null,"finish":"stop","usage":{"prompt_tokens":69,"total_tokens":74,"completion_tokens":5},"ms":457}
+{"id":"sfq_3291","answer":"House fly","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":62,"completion_tokens":3},"ms":403}
+{"id":"sfq_3731","answer":"1863","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":67,"completion_tokens":5},"ms":408}
+{"id":"wh_2290","answer":"Stockholm","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":62,"completion_tokens":3},"ms":312}
+{"id":"bb_8232","answer":"Pippin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":408}
+{"id":"wh_2683","answer":"Mullion","reasoning":null,"finish":"stop","usage":{"prompt_tokens":69,"total_tokens":73,"completion_tokens":4},"ms":460}
+{"id":"jp_4365","answer":"Everglades","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":71,"completion_tokens":4},"ms":457}
+{"id":"sfq_219","answer":"Sandra","reasoning":null,"finish":"stop","usage":{"prompt_tokens":73,"total_tokens":76,"completion_tokens":3},"ms":363}
+{"id":"wh_2493","answer":"Coffee","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":62,"completion_tokens":2},"ms":308}
+{"id":"wh_2197","answer":" Ken Follett","reasoning":null,"finish":"stop","usage":{"prompt_tokens":87,"total_tokens":91,"completion_tokens":4},"ms":467}
+{"id":"qf_1686","answer":"Bob Hope","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":65,"completion_tokens":3},"ms":403}
+{"id":"bb_7795","answer":"Bashir","reasoning":null,"finish":"stop","usage":{"prompt_tokens":69,"total_tokens":73,"completion_tokens":4},"ms":461}
+{"id":"qf_1893","answer":"Horse","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":60,"completion_tokens":3},"ms":310}
+{"id":"sfq_3105","answer":"Barcelona","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":67,"completion_tokens":2},"ms":364}
+{"id":"bb_6729","answer":"Weirs","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":73,"completion_tokens":3},"ms":365}
+{"id":"bb_7994","answer":"AIDA","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":67,"completion_tokens":3},"ms":314}
+{"id":"bb_7406","answer":"Nicolas Sarkozy","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":406}
+{"id":"bb_7898","answer":"Live and Let Die","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":64,"completion_tokens":5},"ms":406}
+{"id":"sfq_416","answer":"Moirai","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":408}
+{"id":"wh_2609","answer":"Linseed oil","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":64,"completion_tokens":4},"ms":405}
+{"id":"sfq_273","answer":"Dolly Parton","reasoning":null,"finish":"stop","usage":{"prompt_tokens":74,"total_tokens":79,"completion_tokens":5},"ms":556}
+{"id":"bb_6847","answer":"Mongolia","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":405}
+{"id":"bb_7189","answer":"Red","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":65,"completion_tokens":2},"ms":310}
+{"id":"wh_2133","answer":"Bob Holness","reasoning":null,"finish":"stop","usage":{"prompt_tokens":74,"total_tokens":78,"completion_tokens":4},"ms":560}
+{"id":"sfq_295","answer":"Cork","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":70,"completion_tokens":3},"ms":364}
+{"id":"sfq_3002","answer":"Cornell University","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":68,"completion_tokens":4},"ms":406}
+{"id":"bb_7262","answer":"Pig","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":314}
+{"id":"wh_2429","answer":"Back for Good","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":71,"completion_tokens":4},"ms":556}
+{"id":"bb_7399","answer":"Germany","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":65,"completion_tokens":2},"ms":310}
+{"id":"bb_7402","answer":"LinkedIn","reasoning":null,"finish":"stop","usage":{"prompt_tokens":78,"total_tokens":80,"completion_tokens":2},"ms":365}
+{"id":"sfq_2925","answer":"Horse","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":309}
+{"id":"bb_8371","answer":"Sydney","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":312}
+{"id":"sfq_462","answer":"Clerk of the House","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":71,"completion_tokens":7},"ms":504}
+{"id":"qf_792","answer":"David and Elizabeth Emanuel","reasoning":null,"finish":"stop","usage":{"prompt_tokens":56,"total_tokens":61,"completion_tokens":5},"ms":502}
+{"id":"sfq_3248","answer":"Li'l Abner","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":65,"completion_tokens":5},"ms":406}
+{"id":"wh_2443","answer":"China","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":63,"completion_tokens":2},"ms":312}
+{"id":"bb_7263","answer":"Tobacco","reasoning":null,"finish":"stop","usage":{"prompt_tokens":75,"total_tokens":79,"completion_tokens":4},"ms":463}
+{"id":"sfq_559","answer":"Trombone","reasoning":null,"finish":"stop","usage":{"prompt_tokens":56,"total_tokens":60,"completion_tokens":4},"ms":404}
+{"id":"sfq_3785","answer":"The Hollies","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":71,"completion_tokens":4},"ms":459}
+{"id":"sfq_3504","answer":"November","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":65,"completion_tokens":2},"ms":310}
+{"id":"sfq_689","answer":"Jack","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":63,"completion_tokens":2},"ms":309}
+{"id":"jp_4224","answer":"Tet","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":67,"completion_tokens":3},"ms":311}
+{"id":"wh_2178","answer":"Mark Carney","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":72,"completion_tokens":4},"ms":460}
+{"id":"qf_1463","answer":"Joe Frazier","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":67,"completion_tokens":4},"ms":406}
+{"id":"sfq_550","answer":"26.2 miles","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":64,"completion_tokens":6},"ms":501}
+{"id":"bb_7289","answer":"Sting","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":65,"completion_tokens":3},"ms":406}
+{"id":"qf_1830","answer":"James Callaghan","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":65,"completion_tokens":4},"ms":405}
+{"id":"sfq_196","answer":"United States","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":312}
+{"id":"bb_7955","answer":"Tiger","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":311}
+{"id":"qf_847","answer":"Oliver Herford","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":65,"completion_tokens":5},"ms":501}
+{"id":"jp_4494","answer":"Pronghorn","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":70,"completion_tokens":4},"ms":457}
+{"id":"jp_4292","answer":"Wrigley","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":404}
+{"id":"bb_6520","answer":"Planck epoch","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":68,"completion_tokens":4},"ms":404}
+{"id":"wh_2073","answer":"Scotland","reasoning":null,"finish":"stop","usage":{"prompt_tokens":89,"total_tokens":91,"completion_tokens":2},"ms":373}
+{"id":"bb_6668","answer":"Self-actualization","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":71,"completion_tokens":5},"ms":458}
+{"id":"sfq_3812","answer":"Eggplant","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":64,"completion_tokens":4},"ms":405}
+{"id":"bb_7175","answer":"Queen Elizabeth II","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":68,"completion_tokens":4},"ms":406}
+{"id":"qf_1683","answer":"Polish","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":62,"completion_tokens":3},"ms":310}
+{"id":"sfq_3502","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":81,"total_tokens":83,"completion_tokens":2},"ms":373}
+{"id":"qf_861","answer":"Charlie Chaplin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":72,"completion_tokens":4},"ms":457}
+{"id":"wh_2686","answer":"The Rovers' Return","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":68,"completion_tokens":6},"ms":599}
+{"id":"qf_1033","answer":"W","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":63,"completion_tokens":2},"ms":312}
+{"id":"qf_1254","answer":"Crimean War","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":402}
+{"id":"sfq_37","answer":"Amoco Cadiz","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":77,"completion_tokens":5},"ms":554}
+{"id":"sfq_3708","answer":"The Four Seasons","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":71,"completion_tokens":4},"ms":456}
+{"id":"sfq_312","answer":"Argentina","reasoning":null,"finish":"stop","usage":{"prompt_tokens":69,"total_tokens":71,"completion_tokens":2},"ms":362}
+{"id":"jp_4099","answer":"Ireland","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":66,"completion_tokens":3},"ms":311}
+{"id":"bb_8072","answer":"Billy Idol","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":405}
+{"id":"jp_4141","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":64,"completion_tokens":2},"ms":311}
+{"id":"sfq_346","answer":"Zambezi","reasoning":null,"finish":"stop","usage":{"prompt_tokens":56,"total_tokens":60,"completion_tokens":4},"ms":418}
+{"id":"bb_8043","answer":"Paris","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":62,"completion_tokens":2},"ms":320}
+{"id":"bb_7437","answer":"Jane Birkin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":67,"completion_tokens":4},"ms":421}
+{"id":"bb_6462","answer":"Whey","reasoning":null,"finish":"stop","usage":{"prompt_tokens":71,"total_tokens":74,"completion_tokens":3},"ms":482}
+{"id":"bb_8203","answer":"Grimaldi","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":447}
+{"id":"qf_971","answer":"Boris Becker","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":67,"completion_tokens":4},"ms":406}
+{"id":"wh_1780","answer":"Eastbourne","reasoning":null,"finish":"stop","usage":{"prompt_tokens":63,"total_tokens":66,"completion_tokens":3},"ms":309}
+{"id":"sfq_530","answer":"Eight maids a-milking","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":76,"completion_tokens":8},"ms":651}
+{"id":"wh_2615","answer":"1977","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":71,"completion_tokens":5},"ms":461}
+{"id":"qf_1594","answer":"Toy Story","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":67,"completion_tokens":3},"ms":311}
+{"id":"sfq_3513","answer":"Gilbert and Sullivan","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":72,"completion_tokens":5},"ms":459}
+{"id":"qf_2136","answer":"Nevada","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":61,"completion_tokens":4},"ms":405}
+{"id":"bb_7161","answer":"Samovar","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":70,"completion_tokens":3},"ms":364}
+{"id":"bb_7149","answer":"Kazakhstan","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":61,"completion_tokens":4},"ms":406}
+{"id":"wh_1890","answer":"Anthony Albanese","reasoning":null,"finish":"stop","usage":{"prompt_tokens":56,"total_tokens":60,"completion_tokens":4},"ms":406}
+{"id":"wh_2223","answer":"Asda","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":312}
+{"id":"sfq_178","answer":"Pulsar","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":69,"completion_tokens":4},"ms":460}
+{"id":"sfq_2754","answer":"Power station","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":70,"completion_tokens":3},"ms":364}
+{"id":"bb_7429","answer":"Les Paul","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":69,"completion_tokens":3},"ms":366}
+{"id":"bb_7899","answer":"9","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":61,"completion_tokens":2},"ms":310}
+{"id":"sfq_3446","answer":"Afghanistan","reasoning":null,"finish":"stop","usage":{"prompt_tokens":68,"total_tokens":71,"completion_tokens":3},"ms":364}
+{"id":"sfq_26","answer":"Berlin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":69,"completion_tokens":2},"ms":365}
+{"id":"bb_7602","answer":"Piano","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":63,"completion_tokens":3},"ms":310}
+{"id":"bb_7396","answer":"Paris Hilton","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":73,"completion_tokens":3},"ms":366}
+{"id":"bb_7966","answer":"Meat Loaf","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":66,"completion_tokens":5},"ms":404}
+{"id":"bb_7975","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":69,"total_tokens":71,"completion_tokens":2},"ms":362}
+{"id":"wh_2171","answer":"Emperor","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":65,"completion_tokens":3},"ms":310}
+{"id":"wh_1889","answer":"Colin Farrell","reasoning":null,"finish":"stop","usage":{"prompt_tokens":84,"total_tokens":88,"completion_tokens":4},"ms":466}
+{"id":"bb_7484","answer":"Violin","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":61,"completion_tokens":3},"ms":311}
+{"id":"sfq_2763","answer":"Grand Union Canal","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":64,"completion_tokens":4},"ms":407}
+{"id":"sfq_359","answer":"The Queen of Hearts","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":70,"completion_tokens":5},"ms":459}
+{"id":"sfq_3103","answer":"John Masefield","reasoning":null,"finish":"stop","usage":{"prompt_tokens":75,"total_tokens":80,"completion_tokens":5},"ms":555}
+{"id":"bb_8205","answer":"Tiananmen","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":69,"completion_tokens":5},"ms":407}
+{"id":"sfq_3685","answer":"Southampton","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":64,"completion_tokens":3},"ms":309}
+{"id":"sfq_3319","answer":"Boris Becker","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":69,"completion_tokens":4},"ms":458}
+{"id":"wh_2051","answer":"Notre-Dame de Paris","reasoning":null,"finish":"stop","usage":{"prompt_tokens":80,"total_tokens":87,"completion_tokens":7},"ms":557}
+{"id":"sfq_2901","answer":"The Holy Grail","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":65,"completion_tokens":5},"ms":407}
+{"id":"sfq_2820","answer":"Rita Hayworth","reasoning":null,"finish":"stop","usage":{"prompt_tokens":74,"total_tokens":79,"completion_tokens":5},"ms":559}
+{"id":"qf_1621","answer":"Don Bradman","reasoning":null,"finish":"stop","usage":{"prompt_tokens":70,"total_tokens":74,"completion_tokens":4},"ms":460}
+{"id":"bb_7279","answer":"John of Gaunt","reasoning":null,"finish":"stop","usage":{"prompt_tokens":61,"total_tokens":66,"completion_tokens":5},"ms":502}
+{"id":"bb_6378","answer":"1994","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":65,"completion_tokens":5},"ms":408}
+{"id":"sfq_3816","answer":"George Best","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":60,"completion_tokens":3},"ms":405}
+{"id":"bb_7364","answer":"Al Gore","reasoning":null,"finish":"stop","usage":{"prompt_tokens":73,"total_tokens":76,"completion_tokens":3},"ms":368}
+{"id":"bb_8401","answer":"Barings Bank","reasoning":null,"finish":"stop","usage":{"prompt_tokens":71,"total_tokens":75,"completion_tokens":4},"ms":462}
+{"id":"wh_2270","answer":"11 Buckingham Palace Road","reasoning":null,"finish":"stop","usage":{"prompt_tokens":72,"total_tokens":78,"completion_tokens":6},"ms":648}
+{"id":"sfq_3026","answer":"Robinson Crusoe","reasoning":null,"finish":"stop","usage":{"prompt_tokens":79,"total_tokens":84,"completion_tokens":5},"ms":461}
+{"id":"wh_2061","answer":"Daniel Defoe","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":63,"completion_tokens":4},"ms":405}
+{"id":"jp_4344","answer":"Flintlock","reasoning":null,"finish":"stop","usage":{"prompt_tokens":62,"total_tokens":66,"completion_tokens":4},"ms":407}
+{"id":"qf_1348","answer":"Lucille Ball","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":70,"completion_tokens":4},"ms":458}
+{"id":"bb_8112","answer":"Kent","reasoning":null,"finish":"stop","usage":{"prompt_tokens":59,"total_tokens":61,"completion_tokens":2},"ms":308}
+{"id":"bb_7203","answer":"Binnacle","reasoning":null,"finish":"stop","usage":{"prompt_tokens":66,"total_tokens":69,"completion_tokens":3},"ms":364}
+{"id":"wh_2375","answer":"UNKNOWN","reasoning":null,"finish":"stop","usage":{"prompt_tokens":84,"total_tokens":86,"completion_tokens":2},"ms":371}
+{"id":"sfq_2723","answer":"Harland and Wolff","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":62,"completion_tokens":5},"ms":500}
+{"id":"qf_957","answer":"1984","reasoning":null,"finish":"stop","usage":{"prompt_tokens":81,"total_tokens":86,"completion_tokens":5},"ms":466}
+{"id":"sfq_3308","answer":"Mantle","reasoning":null,"finish":"stop","usage":{"prompt_tokens":64,"total_tokens":68,"completion_tokens":4},"ms":406}
+{"id":"sfq_3563","answer":"October","reasoning":null,"finish":"stop","usage":{"prompt_tokens":65,"total_tokens":67,"completion_tokens":2},"ms":363}
+{"id":"bb_8179","answer":"Fruit","reasoning":null,"finish":"stop","usage":{"prompt_tokens":57,"total_tokens":60,"completion_tokens":3},"ms":308}
+{"id":"bb_7027","answer":"The Big Bang Theory","reasoning":null,"finish":"stop","usage":{"prompt_tokens":67,"total_tokens":72,"completion_tokens":5},"ms":459}
+{"id":"qf_1391","answer":"Dolly Parton","reasoning":null,"finish":"stop","usage":{"prompt_tokens":60,"total_tokens":65,"completion_tokens":5},"ms":403}
+{"id":"bb_7107","answer":"Belgium","reasoning":null,"finish":"stop","usage":{"prompt_tokens":58,"total_tokens":61,"completion_tokens":3},"ms":310}

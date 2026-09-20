@@ -140,6 +140,20 @@ Carried forward, and one added for this task type:
 An invalid pair is not a negative result. It is a measurement that did not
 happen.
 
+## Correction to the task set, before any grading
+
+The frozen set contained **six duplicate questions** — the page-based sample
+drew the same item twice. They are removed, so **n = 294**.
+
+This is a property of the set, not of any answer: the answers are keyed by
+question id and were never separate measurements, and counting a question twice
+would have given it double weight. The same grounds on which HumanEval/32 was
+excluded before run 1. Recorded here rather than quietly fixed, because a task
+count that changes after a run is exactly the kind of edit a pre-registration
+exists to make visible.
+
+Every threshold in this document is a rate and is unaffected.
+
 ## Known limits
 
 - **Contamination.** TriviaQA is old and public, so all three models have very
