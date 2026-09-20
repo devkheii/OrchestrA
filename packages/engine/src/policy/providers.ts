@@ -1,0 +1,123 @@
+import { homedir } from "node:os";
+import { createSecretBroker, isSecretRef } from "../secrets/broker.js";
+import type { Settings } from "./load-config.js";
+
+/**
+ * Named providers (SPEC §33.2).
+ *
+ * `dem auth add` stores a key and nothing else, which is right — it is the
+ * secret store. On its own it is half a configuration: a credential with no
+ * endpoint cannot be used, and settings held one `baseUrl` and one `model`, so
+ * a second endpoint had nowhere to go at all.
+ *
+ * For this project that is not an edge case. A council is several models from
+ * several places by definition, so the configuration has to express more than
+ * one provider or the central feature cannot be configured.
+ *
+ * The split is deliberate. Endpoints, model names and which credential to use
+ * are not secret and belong in a file that can be committed and reviewed. The
+ * credential itself is not in that file, only its name.
+ */
+
+export interface ProviderConfig {
+  /** A built-in kind: `anthropic`, `claude-cli`. Absent means OpenAI-compatible. */
+  kind?: string | undefined;
+  baseUrl?: string | undefined;
+  model?: string | undefined;
+  /** A reference — `secret://name` or `env://NAME` — never a literal. */
+  apiKey?: string | undefined;
+}
+
+export interface ChosenProvider {
+  /** Which entry this came from, for the error messages and the header. */
+  name: string;
+  kind?: string | undefined;
+  baseUrl?: string | undefined;
+  model?: string | undefined;
+  /** Resolved value, not the reference. Never written back into settings. */
+  apiKey?: string | undefined;
+}
+
+/** Built-in kinds, which are not configured entries and cannot be shadowed. */
+const BUILT_IN = new Set(["anthropic", "claude-cli"]);
+
+/**
+ * The provider to run with, and its credential resolved.
+ *
+ * @param requested a configured name, a built-in kind, or nothing.
+ */
+export async function effectiveProvider(
+  settings: Settings,
+  requested?: string | undefined,
+  home: string = homedir(),
+): Promise<ChosenProvider> {
+  const configured = settings.providers ?? {};
+  const names = Object.keys(configured);
+  const asked = requested ?? settings.provider;
+
+  // A built-in kind is answered before the configured entries, so that
+  // `--provider anthropic` keeps working for someone who has configured
+  // nothing, and so a configured entry cannot quietly take over a kind's name.
+  if (asked && BUILT_IN.has(asked)) {
+    return withKey({ name: asked, kind: asked, ...topLevel(settings) }, home);
+  }
+
+  if (asked) {
+    const entry = configured[asked];
+    if (!entry) {
+      throw new Error(
+        names.length
+          ? `no provider named "${asked}". Configured: ${names.join(", ")}.`
+          : `no provider named "${asked}", and none is configured. ` +
+            `Add one under "providers" in .dem/config.json.`,
+      );
+    }
+    return withKey({ name: asked, ...entry }, home);
+  }
+
+  if (names.length === 1) {
+    // Making someone name the single thing they configured is ceremony.
+    const only = names[0]!;
+    return withKey({ name: only, ...configured[only]! }, home);
+  }
+
+  if (names.length > 1) {
+    // Choosing silently would send this workspace to an endpoint the user did
+    // not select, which is the kind of thing found out months later.
+    throw new Error(
+      `several providers are configured and none is chosen: ${names.join(", ")}. ` +
+        `Pick one with --provider <name>, or set "provider" in .dem/config.json.`,
+    );
+  }
+
+  // Nothing named: the flat settings, which is what a single-endpoint setup
+  // and every existing config still look like.
+  return withKey({ name: "default", ...topLevel(settings) }, home);
+}
+
+function topLevel(settings: Settings): ProviderConfig {
+  return {
+    ...(settings.provider ? { kind: settings.provider } : {}),
+    ...(settings.baseUrl ? { baseUrl: settings.baseUrl } : {}),
+    ...(settings.model ? { model: settings.model } : {}),
+    ...(settings.apiKey ? { apiKey: settings.apiKey } : {}),
+  };
+}
+
+async function withKey(
+  chosen: ChosenProvider & ProviderConfig,
+  home: string,
+): Promise<ChosenProvider> {
+  if (!chosen.apiKey) return chosen;
+
+  // A literal survives here only from the environment, where it was never
+  // written to a file. The config loader refuses one on the way in.
+  if (!isSecretRef(chosen.apiKey)) return chosen;
+
+  const broker = createSecretBroker(process.env, home);
+  try {
+    return { ...chosen, apiKey: await broker.resolve(chosen.apiKey) };
+  } catch (err) {
+    throw new Error(`provider "${chosen.name}": ${(err as Error).message}`);
+  }
+}

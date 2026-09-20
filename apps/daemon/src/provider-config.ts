@@ -60,6 +60,26 @@ export function providerFromSettings(settings: {
   });
 }
 
+/**
+ * The same choice, from an already-resolved named provider (SPEC 33.2).
+ *
+ * `effectiveProvider` has done the naming and the credential lookup; this only
+ * has to build the adapter and apply the egress gate, which stays here so that
+ * every path to a provider passes through the same refusal.
+ */
+export function providerFromChosen(
+  chosen: { kind?: string | undefined; baseUrl?: string | undefined; model?: string | undefined; apiKey?: string | undefined },
+  allowRemote: boolean,
+): ProviderSelection {
+  return resolveProvider({
+    ...(chosen.kind ? { DEM_PROVIDER: chosen.kind } : {}),
+    ...(chosen.model ? { DEM_MODEL: chosen.model } : {}),
+    ...(chosen.baseUrl ? { DEM_BASE_URL: chosen.baseUrl } : {}),
+    ...(chosen.apiKey ? { DEM_API_KEY: chosen.apiKey } : {}),
+    ...(allowRemote ? { DEM_ALLOW_REMOTE: "1" } : {}),
+  });
+}
+
 export function resolveProvider(env: ProviderEnv): ProviderSelection {
   if (env.DEM_PROVIDER === "anthropic") {
     const key = env.DEM_API_KEY ?? env.ANTHROPIC_API_KEY;

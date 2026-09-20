@@ -86,8 +86,22 @@ Then reference it by name: `"apiKey": "secret://openai"`. The store is
 where the platform can express that, and not encrypted. `dem auth` tells you
 all of that rather than implying more.
 
-Give each provider its own name. A council draws on several, and copying one
-key into a shared setting loses track of which endpoint issued it.
+Give each provider its own name, and give the endpoint a place to live beside
+it — `dem auth` stores the key and nothing else, which on its own is half a
+configuration:
+
+```json
+{
+  "providers": {
+    "qwen-27b":   {"baseUrl": "http://...:8002/v1", "model": "qwen3.8-27b",        "apiKey": "secret://qwen-27b"},
+    "qwen-flash": {"baseUrl": "http://...:8000/v1", "model": "qwen3.8-flash-next", "apiKey": "secret://qwen-flash"}
+  }
+}
+```
+
+Then `dem --provider qwen-27b run "..."`. When several are configured and you
+name none, that is an error rather than a guess — picking one silently would
+send this workspace to an endpoint you did not choose.
 
 `"apiKey": "env://OPENAI_API_KEY"` still works and is what CI wants, since a
 pipeline has no prompt to answer. `secret://` never falls back to the

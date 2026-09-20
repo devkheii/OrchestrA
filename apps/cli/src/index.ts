@@ -1,9 +1,10 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { providerFromSettings, startDaemon } from "@dem/daemon";
+import { providerFromChosen, providerFromSettings, startDaemon } from "@dem/daemon";
 import {
   applyDelegated,
   delegate,
+  effectiveProvider,
   ensureModelServer,
   explainSmokeFailure,
   resolveSettings,
@@ -327,11 +328,16 @@ async function withDaemon(
 ): Promise<number> {
   const stateDir = defaultStateDir();
 
-  // The provider comes from resolved settings, so a model written once in
-  // .dem/config.json is the model the daemon runs with.
+  // Which endpoint, and its credential (SPEC 33.2).
+  //
+  // A configured name carries its own baseUrl, model and credential reference,
+  // so two endpoints no longer have to share one setting — which is what made
+  // a council impossible to configure. A setup with no named providers reads
+  // exactly as before, from the flat settings.
   let provider;
   try {
-    provider = providerFromSettings(settings).provider;
+    const chosen = await effectiveProvider(settings);
+    provider = providerFromChosen(chosen, settings.allowRemote).provider;
   } catch (err) {
     io.err(`dem: ${(err as Error).message}\n`);
     return 1;

@@ -1378,6 +1378,8 @@ No release may contain an invariant without a test or an explicit documented exc
 
 So an invariant leaves this document only by being moved to the Exceptions section with a reason, and the matrix carries a provenance column naming the revision each invariant came from.
 
+**Change of 2026-09-20 — providers are named.** §33.2. The flat settings could hold one endpoint, so a council — the feature this project exists for — had no configuration that could express it. Nothing is removed; a single-endpoint config still reads the same way.
+
 **Change of 2026-09-20 — `secret://` is implemented.** §33.1 replaces the deferral. Nothing about invariant 6 is relaxed: a literal in config is still refused, and the store is outside every workspace. What changed is that there is now a usable way to obey the rule, which the previous revision did not provide — it left the environment as the only channel and thereby made writing a key into a file the path of least resistance.
 
 **Change of 2026-09-19 — an unfinished stream stops counting as an answer.** Invariant 45 and §25.4 were added after a model server died mid-generation and then answered 57 further requests with nothing in them, none of which raised. The same measurement showed the limit of the smoke test invariant 44 had just introduced, so §25.3 now states that limit rather than leaving it to be found. A bigger smoke test is the wrong answer to it.
@@ -1449,6 +1451,44 @@ different vendors, so more than one key is the ordinary case rather than an
 edge case. Copying one key into a shared setting loses track of which endpoint
 issued it, which is how a credential is sent to a service that should not have
 it.
+
+### 33.2 Named providers
+
+A credential alone is half a configuration: it has no endpoint. And the flat
+settings held one `baseUrl` and one `model`, so a second endpoint had nowhere
+to go — which meant the central feature of this project, a council of several
+models, could not be configured at all.
+
+```json
+{
+  "providers": {
+    "qwen-27b":   { "baseUrl": "http://...:8002/v1", "model": "qwen3.8-27b",        "apiKey": "secret://qwen-27b" },
+    "qwen-flash": { "baseUrl": "http://...:8000/v1", "model": "qwen3.8-flash-next", "apiKey": "secret://qwen-flash" }
+  },
+  "provider": "qwen-27b"
+}
+```
+
+The split is the point. Endpoints, model names, and *which* credential to use
+are not secret; they belong in a file that can be committed and reviewed. The
+credential is not in that file — only its name is.
+
+Selection: an explicit `--provider <name>`, else `"provider"` in config, else
+the only configured entry when there is exactly one. **When several are
+configured and none is chosen, this is an error rather than a default.**
+Picking one silently would send a workspace to an endpoint its user did not
+select, which is the sort of thing discovered months later.
+
+Built-in kinds — `anthropic`, `claude-cli` — resolve before configured names
+and cannot be shadowed, so `--provider anthropic` keeps working for someone
+who has configured nothing.
+
+A configuration with no `providers` block behaves exactly as before.
+
+**The literal-credential refusal follows the nesting.** A check that knew only
+about a top-level `apiKey` would have waved through
+`{"providers": {"openai": {"apiKey": "sk-..."}}}`, and a nested object is
+precisely where a second look stops happening.
 
 A config file that cannot be read or parsed fails the load rather than being skipped. Silently falling back leaves a user believing their settings — including `maxMode` and `remoteEgress` — are in force when they are not.
 

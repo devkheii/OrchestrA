@@ -8,7 +8,7 @@
  */
 
 export { startDaemon } from "./server.js";
-export { providerFromSettings, resolveProvider } from "./provider-config.js";
+export { providerFromChosen, providerFromSettings, resolveProvider } from "./provider-config.js";
 export type { ProviderEnv, ProviderSelection } from "./provider-config.js";
 export {
   bearerFrom,

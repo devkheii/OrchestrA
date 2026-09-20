@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { PolicyViolation } from "@dem/protocol";
 import type { ConfigScope, PermissionMode, ScopedConfig, SecurityConfig } from "@dem/protocol";
 import { composeSecurity, mergeSettings } from "./config.js";
+import type { ProviderConfig } from "./providers.js";
 
 /**
  * Reading configuration off disk (SPEC §33, tests SEC-013 / SEC-023).
@@ -40,6 +41,12 @@ export interface Settings {
   llamaArgs?: readonly string[];
   /** Run even when the configuration fails its smoke test (SPEC 25.3). */
   skipSmokeTest?: boolean;
+  /**
+   * Named providers, each with its own endpoint, model and credential
+   * reference (SPEC 33.2). A council is several models from several places, so
+   * one endpoint per configuration was never going to be enough.
+   */
+  providers?: Record<string, ProviderConfig>;
   allowRemote: boolean;
   security: SecurityConfig;
 }
@@ -92,6 +99,11 @@ export async function resolveSettings(options: LoadOptions): Promise<Settings> {
   };
 
   if (merged["skipSmokeTest"] === true) settings.skipSmokeTest = true;
+
+  const providers = merged["providers"];
+  if (providers && typeof providers === "object" && !Array.isArray(providers)) {
+    settings.providers = providers as Record<string, ProviderConfig>;
+  }
   const llamaArgs = merged["llamaArgs"];
   if (Array.isArray(llamaArgs) && llamaArgs.every((a) => typeof a === "string")) {
     settings.llamaArgs = llamaArgs as string[];
@@ -153,6 +165,23 @@ async function readConfigFile(path: string): Promise<Record<string, unknown>> {
 }
 
 function assertNoLiteralSecrets(config: Record<string, unknown>, path: string): void {
+  checkFields(config, path, "");
+
+  // Named providers each carry their own credential reference, and a nested
+  // object is exactly where a second look stops happening. The check that only
+  // knew about the top level would have waved through
+  // {"providers": {"openai": {"apiKey": "sk-..."}}}.
+  const providers = config["providers"];
+  if (providers && typeof providers === "object" && !Array.isArray(providers)) {
+    for (const [name, entry] of Object.entries(providers as Record<string, unknown>)) {
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        checkFields(entry as Record<string, unknown>, path, `providers.${name}.`);
+      }
+    }
+  }
+}
+
+function checkFields(config: Record<string, unknown>, path: string, prefix: string): void {
   for (const field of SECRET_FIELDS) {
     const value = config[field];
     if (typeof value !== "string" || !value) continue;
@@ -160,9 +189,10 @@ function assertNoLiteralSecrets(config: Record<string, unknown>, path: string): 
 
     if (LOOKS_LIKE_A_SECRET.test(value)) {
       throw new PolicyViolation(
-        `${path} sets ${field} to what looks like a credential. Config files get committed, ` +
-          `so this would put the key in the repository's history. Write a reference instead: ` +
-          `"${field}": "env://ANTHROPIC_API_KEY".`,
+        `${path} sets ${prefix}${field} to what looks like a credential. Config files get ` +
+          `committed, so this would put the key in the repository's history. Store it with ` +
+          `\`dem auth add <name>\` and write a reference instead: ` +
+          `"${field}": "secret://<name>" (or "env://NAME" for CI).`,
         6,
       );
     }
