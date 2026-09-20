@@ -38,8 +38,14 @@ export interface ChosenProvider {
   apiKey?: string | undefined;
 }
 
-/** Built-in kinds, which are not configured entries and cannot be shadowed. */
-const BUILT_IN = new Set(["anthropic", "claude-cli"]);
+/**
+ * Built-in kinds, which are not configured entries and cannot be shadowed.
+ *
+ * `fake` is here so that asking for the deterministic test provider is an
+ * explicit act. It used to be what a user got for configuring nothing, which
+ * meant a first run answered by echoing the question back and nothing said so.
+ */
+const BUILT_IN = new Set(["anthropic", "claude-cli", "fake"]);
 
 /**
  * The provider to run with, and its credential resolved.

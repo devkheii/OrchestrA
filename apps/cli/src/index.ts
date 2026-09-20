@@ -18,6 +18,7 @@ import type { DaemonHandle, SessionEvent } from "@dem/protocol";
 import { runInteractive } from "./interactive.js";
 import { readLine, runOnce, showLog } from "./commands.js";
 import { runAuth } from "./auth.js";
+import { runSetup } from "./setup.js";
 
 export { createSession, renderSince, runTurn } from "./session-ui.js";
 export type { Approver, PendingCall } from "./session-ui.js";
@@ -48,6 +49,11 @@ export function defaultStateDir(): string {
 }
 
 const HELP = `dem — local-first AI agent harness
+
+Getting started:
+  dem setup            find a model on this machine and write the config
+  dem models           check what dem can reach, and whether it leaves here
+  dem run "..."        ask one question
 
 Usage:
   dem                  start an interactive session
@@ -119,6 +125,27 @@ function withoutFlags(argv: readonly string[]): string[] {
   return out;
 }
 
+/**
+ * Is there a model to talk to?
+ *
+ * The fake provider exists for tests, and a user who has configured nothing
+ * should meet setup rather than an echo. Anything that names an endpoint, a
+ * weights file or a provider kind counts; the rest is checked when it runs.
+ */
+function isConfigured(settings: Settings): boolean {
+  return Boolean(
+    settings.baseUrl ?? settings.modelPath ?? settings.provider ?? settings.providers,
+  );
+}
+
+/**
+ * The fake provider is still reachable, by asking for it.
+ *
+ * `--provider fake` is how the test suite and anyone poking at the harness
+ * gets a deterministic model without one installed. What changed is that it is
+ * no longer what a user gets by default for having configured nothing.
+ */
+
 export async function main(rawArgv: readonly string[], io: Io = consoleIo): Promise<number> {
   let settings: Settings;
   try {
@@ -141,6 +168,11 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
         io.out(HELP);
         return 0;
       }
+      // Nothing configured means setup, not a fake provider that echoes the
+      // question back. Appearing to work spends a user's trust before the
+      // tool has done anything with it.
+      if (!isConfigured(settings)) return runSetup(io, process.cwd());
+
       return withDaemon(settings, io, (daemon) => {
         const selection = providerFromSettings(settings);
         return runInteractive(daemon, settings, process.cwd(), selection.local, selection.label, io);
@@ -151,6 +183,9 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
     case "-h":
       io.out(HELP);
       return 0;
+
+    case "setup":
+      return runSetup(io, process.cwd());
 
     case "auth":
       // No daemon and no provider: storing a credential must work before
@@ -327,6 +362,14 @@ async function withDaemon(
   fn: (d: DaemonHandle) => Promise<number>,
 ): Promise<number> {
   const stateDir = defaultStateDir();
+
+  if (!isConfigured(settings)) {
+    io.err(
+      "dem: no model is configured, so there is nothing to ask.\n\n" +
+        "  Run \u001b[1mdem setup\u001b[0m - it looks for a server or weights already here.\n\n",
+    );
+    return 2;
+  }
 
   // Which endpoint, and its credential (SPEC 33.2).
   //

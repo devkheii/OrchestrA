@@ -61,7 +61,7 @@ describe("dem CLI", () => {
 
   it("runs a prompt end to end and prints the streamed answer", async () => {
     const io = capture();
-    expect(await main(["run", "hello", "there"], io)).toBe(0);
+    expect(await main(["--provider", "fake", "run", "hello", "there"], io)).toBe(0);
     // FakeProvider's derived reply echoes the prompt back deterministically.
     expect(io.stdout).toContain("you said: hello there");
     // The session id is surfaced so the run can be inspected later.
@@ -70,7 +70,7 @@ describe("dem CLI", () => {
 
   it("lists the provider the daemon actually reaches", async () => {
     const io = capture();
-    expect(await main(["models"], io)).toBe(0);
+    expect(await main(["--provider", "fake", "models"], io)).toBe(0);
     expect(io.stdout).toContain("LOCAL");
     expect(io.stdout).toContain("fake");
     expect(io.stdout).toContain("text.generate");

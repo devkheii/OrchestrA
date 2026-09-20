@@ -14,7 +14,49 @@ pnpm install
 pnpm run install:cli   # builds, then puts `dem` on your PATH
 ```
 
-`dem` then works in any directory, and each directory is its own workspace: the path guard, the config file and the session log are all scoped to where you ran it.
+## First minute
+
+```sh
+dem setup
+```
+
+It looks for what is already on this machine — a running Ollama, LM Studio or
+llama.cpp server, and `.gguf` files in the usual places — lists what it found,
+and writes `.dem/config.json` for whichever you pick. It takes under a second
+and it does not configure anything without asking.
+
+```
+dem setup
+
+looking for models on this machine…
+
+Found 5:
+
+  1  Ollama — qwen-coder:latest
+      http://127.0.0.1:11434  ·  already running  ·  qwen-coder:latest
+  2  gemma-4-12b-it-Q4_K_M.gguf
+      6.6GB  ·  E:\models\gemma-4-12b-it-Q4_K_M.gguf  ·  dem will serve it with llama.cpp
+  ...
+  6  something else — type an endpoint myself
+
+which? [1-6]
+```
+
+Nothing found? It says so and tells you the three ways to give it a model,
+rather than starting anyway.
+
+**An unconfigured `dem` refuses to run.** It used to answer with a fake
+provider that echoed your question back, which looks like it works and is
+worse than an error. `--provider fake` still gets you that deterministic
+provider when you actually want one.
+
+Then:
+
+```sh
+dem models           # what it can reach, and whether it leaves this machine
+dem run "..."        # one question
+dem                  # a session
+```
 
 ## Use
 
@@ -23,9 +65,13 @@ dem                      # interactive session — ask, follow up, keep the cont
 dem run "..."            # one prompt, print the answer, exit
 dem log ses_...          # what actually happened in a session
 dem models               # what this daemon can reach, and whether it is LOCAL
+dem setup                # find a model and write the config
+dem auth add <name>      # store a credential for a remote provider
 ```
 
-An interactive session holds one session id for the whole conversation, so a follow-up builds on what came before rather than starting cold. `/new` discards it, `/session` prints the id, `/exit` leaves.
+An interactive session holds one session id for the whole conversation, so a
+follow-up builds on what came before rather than starting cold. `/new` discards
+it, `/session` prints the id, `/exit` leaves.
 
 When a tool needs approval you are asked, with the exact command in view:
 
@@ -35,9 +81,13 @@ requires approval in ASK mode
 allow? [y]es / [a]lways this session / [N]o
 ```
 
-`a` remembers that tool with that exact subject for the rest of the session — saying yes to `npm test` does not say yes to `rm -rf build`. Everything else is asked again. The default is no, including when stdin is a pipe: something that cannot consent is not treated as consenting.
+`a` remembers that tool with that exact subject for the rest of the session —
+saying yes to `npm test` does not say yes to `rm -rf build`. Everything else is
+asked again. The default is no, including when stdin is a pipe: something that
+cannot consent is not treated as consenting.
 
-`dem log` reads the same append-only event log the agent loop rebuilds the conversation from each round. It is the record, not a rendering of one.
+`dem log` reads the same append-only event log the agent loop rebuilds the
+conversation from each round. It is the record, not a rendering of one.
 
 ## Configure
 

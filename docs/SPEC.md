@@ -1643,6 +1643,41 @@ edge case. Copying one key into a shared setting loses track of which endpoint
 issued it, which is how a credential is sent to a service that should not have
 it.
 
+### 33.3 The first minute
+
+A harness that cannot be configured has no users, and configuration was the
+thing this document had most carefully specified and least made possible.
+
+Before `dem setup`, a new user met an interactive prompt backed by a **fake
+provider that echoed their question back**, with nothing saying so unless they
+ran `dem models` and read the header. Appearing to work is worse than refusing
+to start: it spends a user's trust before the tool has done anything with it.
+
+So:
+
+- **An unconfigured harness refuses to run**, and names the command that fixes
+  it. The fake provider remains, reachable by asking for it (`--provider
+  fake`), because a deterministic model is useful to a test and to anyone
+  poking at the harness — but not as what a user gets by default.
+- **`dem setup` reports what is already here**: servers answering on the ports
+  Ollama, LM Studio, llama.cpp, vLLM and others use, and `.gguf` files in the
+  usual directories. All ports are probed at once and a dead one costs its
+  timeout in parallel rather than in sequence, because the machine with nothing
+  running is exactly the machine that most needs this to be quick.
+- **It reports; it does not guess.** Whatever answered is described by what it
+  serves. Nothing is written without being chosen, and an existing config's
+  other settings — security above all — survive a setup run untouched.
+- **Finding nothing is an outcome, not an error.** It says what the three ways
+  to supply a model are and stops.
+
+A credential collected during setup goes through the same store `dem auth`
+writes (§33.1). Setup is not an exception to invariant 6.
+
+An endpoint that is not on this machine prints what that means — that prompts
+and the files read will be sent to it — before `allowRemote` is set, because
+invariant 1 is a refusal the user has to lift deliberately rather than a
+checkbox setup ticks for them.
+
 ### 33.2 Named providers
 
 A credential alone is half a configuration: it has no endpoint. And the flat
