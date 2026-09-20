@@ -426,7 +426,13 @@ Silent continuation after an unresolved decision is prohibited (invariant 32).
 
 ---
 
-## 12. Weighted expert mode
+## 12. Weights
+
+**Weights are a tiebreak inside the ladder of §26, not a mechanism of their
+own.** An earlier revision made weighted voting a way to reach a better answer;
+that claim was measured and did not survive (§28.4). What weights are still
+good for is ordering rungs and breaking a tie between two models that are
+otherwise equally eligible.
 
 Default council mode is equal weight.
 
@@ -488,6 +494,13 @@ disagrees has, by construction, produced no answer; something has to decide
 what happens next, and leaving that to a vote among the members that just
 failed to agree is how a tie becomes a coin flip.
 
+**Reviewing is routing.** The supervisor does not choose a model and then check
+the result; the only routing decision that matters is whether to escalate, and
+that is made after an answer exists. §26 is the loop this section supplies the
+top rung of — and it is the *top* rung deliberately, because a supervisor
+consulted before the cheap rungs would spend the strong model on every task
+(§26.3).
+
 The supervisor is the most capable model available to the session, which will
 usually not be the cheapest. Assembling a council does not remove the need for
 one strong judgment; it changes what that judgment is applied to, from writing
@@ -532,12 +545,20 @@ checks that exist because models are wrong confidently:
 Expert supervisors may receive domain-specific profile advantages, but remain
 subordinate to deterministic verification.
 
-### 13.2 The open question this leaves
+### 13.2 What the weaker members add, now measured
 
-If the strongest model rules on every disagreement, what the weaker members add
-is no longer obvious. That is exactly the quantity §28's `D - C` was written to
-measure, and this section does not answer it. Recorded here so that a later
-reading does not mistake a structural decision for an empirical one.
+This section used to record an open question: if the strongest model rules on
+every disagreement, what do the weaker members contribute?
+
+Measured (§28.4): not a better answer. Pairing models raised accuracy by 0 to
+4 tasks in 60, across every axis tried. What they contribute is **the
+disagreement itself** — a signal that costs one cheap call and tells the
+supervisor when it is needed. On factual questions two models from different
+lineages agreeing were right about 92% of the time, which is a usable trigger
+and not a usable correction.
+
+So a council member is a cheap rung and an alarm, not a voter. The supervisor
+is not counting votes; it is being told where to look.
 
 ---
 
@@ -1008,62 +1029,157 @@ licensed/adapted task sets and real verified operational telemetry.
 
 ---
 
-## 26. Orchestrator maturity
+## 26. The escalation ladder
 
-Automatic scheduling is phased:
+Sections 12, 13 and 26 used to describe three mechanisms: a weighted council, a
+supervisor, and a scheduler that scored models and bound the best one. They are
+one mechanism, and describing it three times is how three implementations that
+drift apart get written.
 
-```text
-OBSERVE
-RECOMMEND
-AUTO
-```
-
-### OBSERVE
-User/static config chooses the model. Harness records:
-
-- prompt tokens;
-- prompt TPS;
-- eval TPS;
-- load/swap time;
-- tool success;
-- verifier pass/fail;
-- actual duration;
-- cost;
-- residency.
-
-### RECOMMEND
-Harness suggests a model/agent but user or policy chooses.
-
-### AUTO
-Enabled only after profile maturity and efficacy criteria are satisfied.
-
-Model scheduling pipeline:
+**One loop.** Try the cheapest model that satisfies the task's hard
+constraints. Decide whether to accept its answer. If not, escalate.
 
 ```text
-Filter
--> Score
--> Bind
--> Execute
--> Measure
+cheapest capable model answers
+  -> accept?   yes -> done
+               no  -> next rung
 ```
 
-Hard filters precede scoring:
+"Which model runs next" is determined entirely by "was the previous answer
+accepted". Orchestration and supervision are not two subsystems; they are the
+two halves of one decision, and separating them breaks both. Routing without
+review has to predict difficulty before seeing an answer, which §26.2 explains
+is the thing that does not work. Review without routing is just review.
 
-- privacy;
-- capability;
+### 26.1 Why order by cost and not by quality
+
+Ranking models by quality is the one input that cannot be obtained cheaply.
+§25.1 removed the requirement to measure it, and a published prior describes a
+model rather than a deployment.
+
+Cost order needs no measurement. Local is cheaper than remote. Small is cheaper
+than large. Both are known before anything runs.
+
+So the ladder never asks which model is better. It asks the cheapest one first
+and finds out. A correct answer from the cheap model costs one call; a wrong
+one costs two. That trade is only bad if the cheap model is usually wrong,
+which is what §26.4 is for.
+
+### 26.2 There is no router model
+
+A router runs before every task. A router that is itself a strong model pays
+the expensive call first, every time, which inverts the thing routing is for.
+
+Measured on the reference set: routing by task family gained **0.0 points** of
+accuracy over simply using the best single model, and perfect per-task routing
+would have gained 4.0. The headroom that a router could capture is small, and a
+model-based router would spend more than it could win.
+
+What remains after removing the router is an ordering — a rule, not a call —
+and the decision to escalate, which happens *after* an answer exists. That
+decision is §26.3.
+
+### 26.3 Who decides to escalate, cheapest first
+
+The supervisor is not consulted until nothing cheaper can settle it.
+
+| available | decides | cost |
+|---|---|---|
+| a deterministic verifier | the verifier (invariant 15) | free |
+| two answers and no verifier | whether they agree | one cheap call |
+| neither | the supervisor (§13) | a strong call |
+
+Invariant 15 already subordinates the supervisor to the verifier for
+correctness. It is also the cheapest arrangement: a failing test escalates a
+code task for nothing.
+
+The agreement rung is worth having and worth bounding. Measured on 294 factual
+questions, when two models from different lineages gave the same answer it was
+right about 92% of the time. That is enough to escalate on and **not** enough
+to correct with — a council does not fix an answer, it flags one (§28.4).
+
+### 26.4 A model that keeps getting escalated
+
+The ladder measures its own rungs. How often a model's answer was escalated is
+its reliability, accumulated from real work rather than from a benchmark — the
+operational evidence of §25.1, and only from outcomes that carried an
+independent verification (invariant 18).
+
+A rung with a high escalation rate is demoted or dropped, subject to the
+maturity thresholds in §25: below 30 verified samples nothing is concluded.
+
+This closes the gap §25.3 left open. A smoke test detects a configuration that
+is broken; it cannot detect one that is merely worse. The ladder notices
+"merely worse" over time, because a model that is quietly bad is a model whose
+answers keep being replaced.
+
+**A user may also just turn a model off.** Removing a rung is one line of
+config and does not wait for statistics. An automatic mechanism that is the
+only way to reject a model is a mechanism that argues with its user.
+
+### 26.5 What the user actually chooses
+
+Two dials, not two modes.
+
+**How far to climb** — the supervisor modes of §13:
+
+```text
+on_disagreement   (default)
+final
+always
+```
+
+**How to climb** — sequentially or by asking several at once:
+
+```text
+sequential      cheap, slower: try a rung, then the next
+parallel-small   faster, dearer: ask several and compare
+hybrid
+```
+
+Sequential spends calls only when needed. Parallel spends them always and
+returns sooner. Which is right depends on whether the user is waiting.
+
+### 26.6 Degrading to nothing
+
+With one model configured there is no ladder and no routing; the harness
+behaves exactly as it does today. With two, there is one rung and one
+escalation. Nothing here may become a precondition for using the harness with a
+single model, which is what most installations will have.
+
+### 26.7 Phases
+
+Unchanged in spirit, narrowed in what they gate:
+
+```text
+OBSERVE     the user's configuration chooses; the harness records outcomes
+RECOMMEND   the harness proposes a rung order; the user or policy decides
+AUTO        the harness orders the rungs itself
+```
+
+AUTO needs sufficient telemetry (invariant 25) — but only for *ordering* and
+*demotion*, not for a quality score. Under OBSERVE the ladder still works,
+because cost order is known without any telemetry at all.
+
+Recorded for every run, as before: prompt tokens, prompt TPS, eval TPS,
+load/swap time, tool success, verifier pass/fail, actual duration, cost,
+residency. And, added by this section: which rung answered, whether it was
+escalated, and what decided that.
+
+### 26.8 Hard constraints still precede everything
+
+Before cost order is consulted at all, a model that cannot do the job is
+removed (invariant 39):
+
+- privacy and egress;
+- capability, including whether it can call tools;
 - context capacity;
 - VRAM/RAM feasibility;
-- budget.
+- budget;
+- a failed smoke test (§25.3, invariant 44).
 
-Scoring may include:
-
-- measured quality;
-- capability match;
-- ETA;
-- current residency;
-- swap cost;
-- reliability;
-- remote cost.
+None of these is a score and none can be outweighed. Cost order applies only to
+what survives them.
 
 ---
 
@@ -1140,6 +1256,60 @@ Changing the task set, the metric, or the threshold after seeing results invalid
 
 If Democracy does not materially improve the target metrics over **arm C** at the pre-registered effect size, it remains experimental/optional and is not promoted as the default mode. Negative results are documented, not discarded.
 
+### 28.4 Result: it did not, and the gate holds
+
+Documented here rather than left in an experiment directory, because it is the
+reason §§12, 13 and 26 read the way they now do.
+
+Five pre-registered runs, in `experiments/ceiling/`. Each rule was fixed before
+the run it governed, and none was edited afterwards.
+
+**Pairing models does not raise accuracy on verifiable tasks.** The most any
+council of a pair could have gained over simply using its better member — a
+perfect selector, not an achievable one — was 0 to 4 tasks in 60.
+
+| pair | ceiling / 60 |
+|---|---|
+| two 7B code models, different lineage | 3 |
+| a 7B code model and a general 8B | 2 |
+| two 27B-class models | 1–2 |
+| the same weights, deliberating and not | 0 |
+
+**The cause is correlated failure, not weak models.** φ between failures ran
+from 0.47 to 0.90. Had failures been independent, the same pairs would have had
+ceilings near 8 to 10 and the gate would have opened. Every axis tried —
+different vendor, different size, different reasoning mode — left the
+correlation intact; holding the weights constant and varying only deliberation
+produced the *highest* correlation measured, 0.90, with a ceiling of 0.
+
+**On code, the verifier was doing the work.** That is what arm C exists to
+separate, and separated, it was nearly all of it. Where a deterministic
+verifier decides, a second model is close to redundant.
+
+**Where there is no verifier, agreement is a usable signal.** On 294 factual
+questions, two models from different lineages giving the same answer were right
+about 92% of the time. Abstaining on every disagreement removed 71–81% of the
+better model's errors but answered only 59–67% of questions, failing the
+pre-registered coverage floor — so the signal is worth **escalating** on and
+not worth **abstaining** on. §26.3 is where that lands.
+
+**Routing has the same ceiling as voting.** Routing by task family gained 0.0
+points over the best single model; perfect per-task routing would have gained
+4.0. This is why §26 orders rungs by cost rather than by predicted quality.
+
+Consequences, all of them already applied above:
+
+- Democracy is not promoted as a default mode, and the v0.2-alpha council is
+  not built as an accuracy mechanism (§30);
+- a council member is a cheap rung and an alarm rather than a voter (§13.2);
+- weights are a tiebreak, not a mechanism (§12);
+- the orchestrator orders by cost and escalates, rather than scoring quality
+  (§26).
+
+The open half of the premise is untouched: **open tasks**, where the claim is
+to surface meaningful divergence rather than to be right more often, were never
+measured. Nothing above is evidence about them, in either direction.
+
 ---
 
 ## 29. Build-vs-borrow
@@ -1209,40 +1379,59 @@ Required:
 - Claude Code as an external agent under the delegation boundary of §4.2
   (invariant 34), rather than as a provider with its tools stripped.
 
-### v0.2-alpha — Minimal Democracy Efficacy Spike
+### v0.2-alpha — The escalation ladder
+
+**Rewritten after §28.4.** This milestone was "Minimal Democracy Efficacy
+Spike": a two-model council, blind Round 1, weighted voting, a counterexample
+runner, and the experiment to justify them. The experiment ran first, which was
+the point of putting it here, and it came back negative. What that removes is
+the council as an accuracy mechanism. What it leaves is a loop that spends the
+cheapest thing that can settle a question (§26).
+
 Required:
 
-- sandbox adapter + health probe (prerequisite for the counterexample runner);
-- static 2-model council;
-- a designated supervisor, defaulting to `on_disagreement` (invariant 43);
-- declared weights with recorded provenance, defaulting to equal (invariant 42);
-- a local fit probe as a hard filter before scoring (§25.2, invariant 39);
-- blind Round 1;
-- DecisionEnvelope;
-- task override/classification;
-- boolean/numeric/factual/code comparator;
-- executable counterexample validation under §8.4;
-- max 1 reconsideration round;
-- verifier integration;
-- pre-registered efficacy benchmark with arms A–D.
+- **sandbox adapter + health probe** — unchanged, and now the highest-value item
+  on the list: it is what raises the permission ceiling above `ASK` and what a
+  verifier needs to run model-written code;
+- **verifier integration**, and with it the free rung of §26.3;
+- **the ladder**: hard-constraint filtering (§26.8), cost ordering (§26.1),
+  escalation (§26.3), and the per-rung outcome record (§26.7);
+- **a designated supervisor**, defaulting to `on_disagreement` (invariant 43),
+  as the top rung rather than as a council chair;
+- **a second model as a rung and an alarm** — two answers compared, escalating
+  on disagreement. Not a vote, not weighted, no reconsideration round;
+- **boolean/numeric/factual/code comparator**, which is what "do these two
+  answers agree" requires;
+- **DecisionEnvelope**, recording which rung answered, what escalated it, and
+  what decided that (§26.7);
+- **declared weights with recorded provenance** (invariant 42), used as a
+  tiebreak in rung order (§12);
+- **the smoke test as a hard filter** (§25.3, invariant 44).
 
-Explicitly excluded:
+Explicitly excluded, and now for measured reasons rather than sequencing ones:
 
-- automatic orchestrator;
-- weighted council;
-- large benchmark registry;
-- complex task decomposition;
-- open-task path.
+- **weighted voting** — §28.4: pairing does not raise accuracy, so weighting the
+  pairing cannot either;
+- **blind Round 1 and reconsideration rounds** — machinery for converting
+  disagreement into a better answer, which is the thing that did not work;
+- **executable counterexample validation** — deferred with the rest of the
+  correction machinery; the sandbox it needed is still built, for the verifier;
+- **automatic rung ordering** — OBSERVE only (§26.7); the user's configuration
+  orders the rungs;
+- large benchmark registry, complex task decomposition, open-task path.
 
-### v0.2-beta — Democracy + Telemetry
+### v0.2-beta — Telemetry and strategy
 Add:
 
-- open-task `DIVERGENT` path and its runtime semantics (§11.1);
+- telemetry collection, and the escalation-rate record that demotes a rung
+  (§26.4);
+- `sequential` / `parallel-small` / `hybrid` — the second dial of §26.5;
+- supervisor modes beyond the default (`final`, `always`) — the first dial;
+- open-task `DIVERGENT` path and its runtime semantics (§11.1). This is the
+  half of the premise §28.4 did not measure, and it is where divergence is the
+  product rather than a trigger;
 - quorum/partial failure;
-- more robust evidence/objection paths;
-- telemetry collection;
-- sequential/parallel-small/hybrid execution strategies;
-- supervisor modes beyond the v0.2-alpha default (`final`, `always`).
+- more robust evidence/objection paths.
 
 ### v0.3 — Orchestrator Recommend
 Add:
@@ -1377,6 +1566,8 @@ No release may contain an invariant without a test or an explicit documented exc
 **Removing an invariant is an explicit act.** Six invariants were lost between v2.1 and v2.2 — tool execution bypassing the permission broker, child-policy inheritance, memory scope isolation, and three about benchmark and scheduling honesty. None was argued down; the list was renumbered and they fell out. A tool that checks invariants against tests cannot catch this, because an invariant with no row has nothing to check.
 
 So an invariant leaves this document only by being moved to the Exceptions section with a reason, and the matrix carries a provenance column naming the revision each invariant came from.
+
+**Change of 2026-09-20 — three mechanisms become one loop.** §§12, 13 and 26 described a weighted council, a supervisor and a scoring scheduler. They are one mechanism — "which model runs next" is decided by "was the previous answer accepted" — and describing it three times is how three implementations that drift apart get written. §26 is now the loop; §12 is a tiebreak inside it; §13 is its top rung. No invariant is removed: 14, 15, 39, 40, 42 and 43 all still hold and several do more work than before. What is removed is the claim that voting improves an answer, which §28.4 measured and disproved, and the machinery that existed only to serve it — blind Round 1, reconsideration rounds, weighted voting — which leaves v0.2-alpha as an escalation ladder rather than a council.
 
 **Change of 2026-09-20 — providers are named.** §33.2. The flat settings could hold one endpoint, so a council — the feature this project exists for — had no configuration that could express it. Nothing is removed; a single-endpoint config still reads the same way.
 
