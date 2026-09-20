@@ -18,9 +18,17 @@ export const ALL = {
     gpuLayers: 999,
   },
 
-  // Run 1. Kept so that run 1's report stays reproducible, and because its
-  // result is worth keeping: at 4.7 tok/s and roughly 10x the tokens per
-  // answer, a reasoning model is not a viable council member on 8GB.
+  // EXCLUDED after run 3 (see README.md). Kept so that runs 1 and 3 stay
+  // reproducible, and because what it established is worth keeping.
+  //
+  // Not slow -- unmeasurable. Run 1 gave it 3,072 tokens at 3.8 tok/s and 29
+  // of 60 truncated; run 3 gave it 8,192 at roughly 13 tok/s and 33 truncated.
+  // Four times the budget and four times the speed moved nothing, because the
+  // constraint is tokens per answer against a context that fits in 8GB, and
+  // neither of those changed.
+  //
+  // A statement about the deployment, not the model: of the 27 answers it did
+  // finish in run 3, it passed 27.
   gemma: {
     key: "gemma",
     label: "Gemma-4-12B-it",

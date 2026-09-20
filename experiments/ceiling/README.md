@@ -111,3 +111,43 @@ Grading executes model-written code, so it runs in a container with no network
 and no privileges — SPEC §8.4 requires that of counterexample execution, and
 the experiment that decides whether to build that should not be held to a
 looser standard than the thing it decides about.
+
+---
+
+## Excluded models
+
+Recorded rather than dropped. A model that leaves this list silently looks like
+one that was never tried.
+
+### Gemma-4-12B-it Q4_K_M — excluded 2026-09-20, after run 3
+
+**Not measurable on this hardware.** Three attempts:
+
+| | budget | throughput | answered | truncated | wall clock |
+|---|---|---|---|---|---|
+| run 1 | 3,072 | 3.8 tok/s | 31/60 | 29 | 9.1 h |
+| run 3 | 8,192 | ~13 tok/s | 27/60 | 33 | 4.6 h |
+
+Quadrupling the budget and nearly quadrupling the throughput did not move it.
+It needs more tokens per answer than an 8GB card can carry at a context that
+fits, so it fails validity condition 1 every time — more than 5 of 60
+unanswered means the model was not measured, whatever the cells say.
+
+**This is a statement about the deployment, not about the model.** Gemma is not
+bad at these tasks; on the 27 it finished in run 3 it passed 27. It is
+unmeasurable here, and on a card with more VRAM the question would be open
+again.
+
+**What its exclusion does not change.** Runs 2 and 3 were decided on valid
+pairs only, so no verdict moves. What is lost is the question Gemma was brought
+in to answer: whether a model that produces answers a *different way* fails on
+different tasks. All three remaining models answer in one shot, and all three
+pairs of them correlate at phi 0.49–0.58.
+
+**What must not be recovered later.** Gemma's pairs show phi 0.26–0.36 and one
+of them reaches a ceiling of 6, which is the threshold. Those numbers are
+artifacts of the truncations: a truncated answer is scored as a failure, those
+failures land on tasks unrelated to where the other model fails, and that
+pushes phi down and the ceiling up mechanically. They are the most encouraging
+numbers in the experiment and they are not evidence of anything.
+
