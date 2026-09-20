@@ -110,7 +110,7 @@ async function ask(model, prompt) {
   // failed at a constant 307s -- 47 of 60 -- and that failure looked like the
   // model's, which is exactly the confusion the pre-registration forbids.
   // Streaming returns the headers immediately and the timeout never applies.
-  const res = await fetch(`${endpointOf(model)}/v1/chat/completions`, {
+  const res = await fetch(chatUrl(model), {
     method: "POST",
     headers: await authHeaders(model),
     body: JSON.stringify({
@@ -202,8 +202,20 @@ async function knownSecrets(models) {
   return out;
 }
 
-function endpointOf(model) {
-  return (model.baseUrl ?? `http://127.0.0.1:${PORT}`).replace(/\/+$/, "");
+/**
+ * The chat completions URL, for both conventions people write a baseUrl in.
+ *
+ * A configured endpoint usually already ends in `/v1`, and appending another
+ * produced `/v1/v1/chat/completions` and a 404 on every one of 240 requests.
+ * It cost nothing because the pre-registered rule records a failed request as
+ * a failed request rather than a wrong answer, so a re-run simply retries
+ * them -- but only because that rule was written before the run.
+ */
+function chatUrl(model) {
+  const base = (model.baseUrl ?? `http://127.0.0.1:${PORT}`).replace(/\/+$/, "");
+  return /\/v\d+$/.test(base)
+    ? `${base}/chat/completions`
+    : `${base}/v1/chat/completions`;
 }
 
 /**
