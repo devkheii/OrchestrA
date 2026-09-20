@@ -164,3 +164,51 @@ export const RUN3 = [
 
 /** Named sets, so a run selects one without editing this file. */
 export const SETS = { run1: MODELS, run2: RUN2, run3: RUN3 };
+
+/**
+ * Run 4: the same weights, answering twice.
+ *
+ * Every model measured so far answers in one shot, and all of them correlate
+ * at phi 0.47-0.58. The hypothesis left standing is that a model producing
+ * answers a *different way* fails on different tasks -- and the obstacle has
+ * always been that changing the style also changed the vendor, the size and
+ * the training data.
+ *
+ * Toggling thinking on one endpoint removes that obstacle entirely: lineage,
+ * parameter count and quantization are held equal because it is the same file.
+ * One variable is left.
+ *
+ * Verified before PREREG-4 was written: `enable_thinking: false` drops
+ * reasoning content to zero characters on both endpoints while the answer
+ * stays correct. `enable_thinking` at the top level is silently ignored, which
+ * is why it goes through `chat_template_kwargs`.
+ */
+const remote = (key, label, url, credential, model, thinking) => ({
+  key,
+  label,
+  quant: "server-side",
+  family: "Qwen3.8",
+  remote: true,
+  baseUrl: url,
+  credential,
+  remoteModel: model,
+  // Equal for both halves of a paired comparison. A budget that differed
+  // between them would measure the budget.
+  maxTokens: 8192,
+  contextSize: 8192,
+  gpuLayers: 0,
+  extraBody: { chat_template_kwargs: { enable_thinking: thinking } },
+});
+
+const Q27 = "http://10.50.140.134:8002/v1";
+const QF = "http://10.50.140.168:8000/v1";
+
+export const RUN4 = [
+  remote("q27-think", "Qwen3.8-27B (thinking)", Q27, "qwen-27b", "qwen3.8-27b", true),
+  remote("q27-flat", "Qwen3.8-27B (no thinking)", Q27, "qwen-27b", "qwen3.8-27b", false),
+  remote("qf-think", "Qwen3.8-Flash-Next (thinking)", QF, "qwen-flash", "qwen3.8-flash-next", true),
+  remote("qf-flat", "Qwen3.8-Flash-Next (no thinking)", QF, "qwen-flash", "qwen3.8-flash-next", false),
+];
+
+for (const model of RUN4) ALL[model.key] = model;
+SETS.run4 = RUN4;

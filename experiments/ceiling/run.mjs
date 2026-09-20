@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readCredential } from "./credentials.mjs";
 import { ALL, MODELS, SETS, LLAMA, PORT, SAMPLING } from "./models.mjs";
 
 /**
@@ -81,9 +82,8 @@ for (const model of selected) {
         // written to disk and read back later; a key in there outlives the
         // session the user set it for.
         let message = String(err.message ?? err);
-        for (const model2 of selected) {
-          const secret = model2.apiKeyEnv ? process.env[model2.apiKeyEnv] : undefined;
-          if (secret && secret.length > 8) message = message.split(secret).join("<redacted>");
+        for (const secret of await knownSecrets(selected)) {
+          if (secret.length > 8) message = message.split(secret).join("<redacted>");
         }
         record = { id: task.task_id, error: message, ms: Date.now() - at };
       }
@@ -112,7 +112,7 @@ async function ask(model, prompt) {
   // Streaming returns the headers immediately and the timeout never applies.
   const res = await fetch(`${endpointOf(model)}/v1/chat/completions`, {
     method: "POST",
-    headers: authHeaders(model),
+    headers: await authHeaders(model),
     body: JSON.stringify({
       // A remote endpoint needs the provider's own model id; a local server
       // serves whatever it was started with and ignores this.
@@ -130,6 +130,9 @@ async function ask(model, prompt) {
       stream: true,
       stream_options: { include_usage: true },
       ...SAMPLING,
+      // Per-model request fields, e.g. turning thinking off. Spread last so a
+      // configuration cannot be silently overridden by a shared default.
+      ...(model.extraBody ?? {}),
     }),
   });
 
@@ -186,6 +189,19 @@ async function ask(model, prompt) {
   return { answer, reasoning: reasoning || null, finish, usage };
 }
 
+/** Every credential this run could have touched, for scrubbing error text. */
+async function knownSecrets(models) {
+  const out = [];
+  for (const model of models) {
+    if (model.credential) {
+      const value = await readCredential(model.credential);
+      if (value) out.push(value);
+    }
+    if (model.apiKeyEnv && process.env[model.apiKeyEnv]) out.push(process.env[model.apiKeyEnv]);
+  }
+  return out;
+}
+
 function endpointOf(model) {
   return (model.baseUrl ?? `http://127.0.0.1:${PORT}`).replace(/\/+$/, "");
 }
@@ -202,18 +218,29 @@ function endpointOf(model) {
  * into the log line, not into an error message. `models.mjs` is committed and
  * holds only the variable's name.
  */
-function authHeaders(model) {
+async function authHeaders(model) {
   const headers = { "content-type": "application/json" };
-  if (!model.apiKeyEnv) return headers;
 
-  const key = process.env[model.apiKeyEnv];
-  if (!key) {
-    throw new Error(
-      `${model.key} needs ${model.apiKeyEnv} in the environment. ` +
-        `Set it for this session only -- it is not read from any file.`,
-    );
+  // The store the product uses, so the experiment does not need a second way
+  // to hold a credential -- and so a key set once with `dem auth add` works
+  // here too, rather than having to be exported into this shell as well.
+  if (model.credential) {
+    const key = await readCredential(model.credential);
+    if (!key) {
+      throw new Error(
+        `${model.key} needs a stored credential named "${model.credential}". ` +
+          `Add one with: dem auth add ${model.credential}`,
+      );
+    }
+    headers["authorization"] = `Bearer ${key}`;
+    return headers;
   }
-  headers["authorization"] = `Bearer ${key}`;
+
+  if (model.apiKeyEnv) {
+    const key = process.env[model.apiKeyEnv];
+    if (!key) throw new Error(`${model.key} needs ${model.apiKeyEnv} in the environment.`);
+    headers["authorization"] = `Bearer ${key}`;
+  }
   return headers;
 }
 
