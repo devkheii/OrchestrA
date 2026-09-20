@@ -28,7 +28,7 @@ Every invariant in SPEC §2 maps to at least one automated test ID. No release s
 | 3 | Permission and sandbox are independent layers | `SEC-008`, `SEC-010` | permissions, runtime | deferred (v0.2-alpha) — sandbox adapter lands with the counterexample runner |
 | 4 | Every endpoint authenticated (except minimal `/healthz`) | `SEC-001` | daemon | green |
 | 5 | Host/Origin validation, CORS deny-by-default | `SEC-002` | daemon | green |
-| 6 | Secrets never in context/memory/audit/child env/UI | `SEC-005`, `SEC-015`, `SEC-023` | secrets, audit, context, policy | green |
+| 6 | Secrets never in context/memory/audit/child env/UI | `SEC-005`, `SEC-015`, `SEC-023`, `SEC-025` | secrets, audit, context, policy | green — `SEC-025` added 2026-09-20 with the credential store (§33.1) |
 | 7 | Child processes get a sanitized environment | `SEC-005` | runtime, permissions | green |
 | 8 | Path access checked by canonical/real path | `SEC-003`, `SEC-004` | policy, tools | green |
 | 9 | Untrusted content cannot become instruction | `SEC-016` | context | green |

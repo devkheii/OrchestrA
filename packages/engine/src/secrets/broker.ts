@@ -1,4 +1,5 @@
-import { NotImplemented } from "@dem/protocol";
+import { homedir } from "node:os";
+import { readCredential } from "./store.js";
 
 /**
  * Secret Broker (invariants 6 and 7; tests SEC-005, SEC-015).
@@ -104,12 +105,26 @@ export interface SecretBroker {
  * v0.1 broker.
  *
  * `env://NAME` reads from the daemon's own environment — the development and
- * CI path. `secret://` needs an OS keychain, which is not implemented: doing
- * it properly means DPAPI on Windows and platform CLIs elsewhere, and a
- * half-working keychain that silently falls back to a file would be worse than
- * none, because the user would believe their key was in the keychain.
+ * CI path, since a pipeline has no interactive prompt. `secret://` resolves
+ * from the credential store the CLI writes (`secrets/store.ts`).
+ *
+ * An earlier revision left `secret://` unimplemented, arguing that a keychain
+ * which silently degrades into a file is worse than none. That argument was
+ * right and it is not an argument against this: the store does not claim to be
+ * a keychain, and `dem auth` says where the file is and what protects it. What
+ * the argument did produce was a release where the only way to supply a
+ * credential was an environment variable, which pushed users toward writing
+ * keys into config files — the thing invariant 6 exists to prevent.
+ *
+ * The two schemes name two different places and neither stands in for the
+ * other. `secret://` never falls back to the environment: a reference that
+ * quietly resolved from somewhere else is how a user ends up believing a key
+ * is stored when it is not.
  */
-export function createSecretBroker(env: NodeJS.ProcessEnv = process.env): SecretBroker {
+export function createSecretBroker(
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = homedir(),
+): SecretBroker {
   const handedOut = new Set<string>();
 
   return {
@@ -121,7 +136,18 @@ export function createSecretBroker(env: NodeJS.ProcessEnv = process.env): Secret
         handedOut.add(value);
         return value;
       }
-      throw new NotImplemented(`OS keychain resolution for ${ref}`, "phase-2");
+      const name = ref.slice("secret://".length);
+      const value = await readCredential(name, home);
+      if (value === undefined) {
+        throw new Error(
+          `no stored credential named "${name}". Add one with: dem auth add ${name}`,
+        );
+      }
+      // Everything handed out is remembered so the redactor can scrub it; a
+      // value that reaches an adapter without passing through here is a value
+      // that can surface in a log (invariant 6).
+      handedOut.add(value);
+      return value;
     },
 
     knownValues(): readonly string[] {

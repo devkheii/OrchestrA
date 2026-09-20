@@ -61,7 +61,9 @@ for (const model of selected) {
   }
   console.log(`${model.key}: ${todo.length} to answer (${done.size} already done)`);
 
-  const server = await startServer(model);
+  // A remote model has no server to start. `startServer` binds a port and
+  // loads weights; for an endpoint someone else runs, both are wrong.
+  const server = model.remote ? { stop: async () => {} } : await startServer(model);
   const started = Date.now();
 
   try {
@@ -75,7 +77,15 @@ for (const model of selected) {
         // A failed request is recorded as a failed request, not as a wrong
         // answer. Scoring an infrastructure error as a model error would move
         // the exact cell this experiment measures.
-        record = { id: task.task_id, error: String(err.message ?? err), ms: Date.now() - at };
+        // Scrub any credential that reached the message. An error string is
+        // written to disk and read back later; a key in there outlives the
+        // session the user set it for.
+        let message = String(err.message ?? err);
+        for (const model2 of selected) {
+          const secret = model2.apiKeyEnv ? process.env[model2.apiKeyEnv] : undefined;
+          if (secret && secret.length > 8) message = message.split(secret).join("<redacted>");
+        }
+        record = { id: task.task_id, error: message, ms: Date.now() - at };
       }
       appendFileSync(outPath, JSON.stringify(record) + "\n");
 
@@ -100,11 +110,13 @@ async function ask(model, prompt) {
   // failed at a constant 307s -- 47 of 60 -- and that failure looked like the
   // model's, which is exactly the confusion the pre-registration forbids.
   // Streaming returns the headers immediately and the timeout never applies.
-  const res = await fetch(`http://127.0.0.1:${PORT}/v1/chat/completions`, {
+  const res = await fetch(`${endpointOf(model)}/v1/chat/completions`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: authHeaders(model),
     body: JSON.stringify({
-      model: model.key,
+      // A remote endpoint needs the provider's own model id; a local server
+      // serves whatever it was started with and ignores this.
+      model: model.remoteModel ?? model.key,
       messages: [
         {
           role: "user",
@@ -172,6 +184,37 @@ async function ask(model, prompt) {
   }
 
   return { answer, reasoning: reasoning || null, finish, usage };
+}
+
+function endpointOf(model) {
+  return (model.baseUrl ?? `http://127.0.0.1:${PORT}`).replace(/\/+$/, "");
+}
+
+/**
+ * Credentials, by name rather than by value.
+ *
+ * Each model says which environment variable holds its key. Several providers
+ * means several keys, and copying them into one shared variable loses track of
+ * which endpoint a key belongs to -- which is how a key ends up sent to a
+ * service it was not issued for.
+ *
+ * The key is read here and goes nowhere else: not into the answer records, not
+ * into the log line, not into an error message. `models.mjs` is committed and
+ * holds only the variable's name.
+ */
+function authHeaders(model) {
+  const headers = { "content-type": "application/json" };
+  if (!model.apiKeyEnv) return headers;
+
+  const key = process.env[model.apiKeyEnv];
+  if (!key) {
+    throw new Error(
+      `${model.key} needs ${model.apiKeyEnv} in the environment. ` +
+        `Set it for this session only -- it is not read from any file.`,
+    );
+  }
+  headers["authorization"] = `Bearer ${key}`;
+  return headers;
 }
 
 async function startServer(model) {

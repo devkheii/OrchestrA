@@ -74,7 +74,25 @@ trade is deliberate (SPEC §25.3).
 
 Precedence is `CLI > environment > workspace > user > defaults` (SPEC §33). Security settings do not follow it: they compose monotonically, so a narrower scope can only tighten. A malformed config file is refused rather than skipped — believing your `maxMode` is in force when it silently is not is the opposite of what the setting was for.
 
-**Credentials never go in config as literals.** Config files get committed. Write a reference — `"apiKey": "env://ANTHROPIC_API_KEY"` — and the loader refuses anything that looks like a real key.
+**Credentials never go in config as literals.** Config files get committed, so the loader refuses anything that looks like a real key. Store one instead:
+
+```sh
+dem auth add openai        # prompts, does not echo, does not touch shell history
+dem auth list              # names and dates, never values
+```
+
+Then reference it by name: `"apiKey": "secret://openai"`. The store is
+`~/.dem/credentials.json` — your home directory, never a workspace, owner-only
+where the platform can express that, and not encrypted. `dem auth` tells you
+all of that rather than implying more.
+
+Give each provider its own name. A council draws on several, and copying one
+key into a shared setting loses track of which endpoint issued it.
+
+`"apiKey": "env://OPENAI_API_KEY"` still works and is what CI wants, since a
+pipeline has no prompt to answer. `secret://` never falls back to the
+environment: a reference that quietly resolved from somewhere else is how you
+come to believe a key is stored when it is not.
 
 ## Providers
 

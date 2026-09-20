@@ -1312,6 +1312,7 @@ Test IDs are normative; see `docs/INVARIANT_TEST_MATRIX.md` for the invariant ma
 - `ORCH-007` an online benchmark score is labelled as a prior and never reported as a local measurement;
 - `ORCH-008` a configuration that fails the smoke test is filtered out before scoring, and the result is cached by configuration;
 - `SEC-024` a stream ending without a terminating frame or finish reason is reported as an error, not as a completed answer;
+- `SEC-025` a stored credential lives outside any workspace, is never listed by value, and `secret://` does not fall back to the environment;
 - `SEC-022` a model narrating a tool call it did not make fails the run instead of having its fabricated result reported as an answer;
 - `SEC-023` a literal credential in a config file is refused, and a malformed config file fails loudly rather than being skipped.
 
@@ -1377,6 +1378,8 @@ No release may contain an invariant without a test or an explicit documented exc
 
 So an invariant leaves this document only by being moved to the Exceptions section with a reason, and the matrix carries a provenance column naming the revision each invariant came from.
 
+**Change of 2026-09-20 — `secret://` is implemented.** §33.1 replaces the deferral. Nothing about invariant 6 is relaxed: a literal in config is still refused, and the store is outside every workspace. What changed is that there is now a usable way to obey the rule, which the previous revision did not provide — it left the environment as the only channel and thereby made writing a key into a file the path of least resistance.
+
 **Change of 2026-09-19 — an unfinished stream stops counting as an answer.** Invariant 45 and §25.4 were added after a model server died mid-generation and then answered 57 further requests with nothing in them, none of which raised. The same measurement showed the limit of the smoke test invariant 44 had just introduced, so §25.3 now states that limit rather than leaving it to be found. A bigger smoke test is the wrong answer to it.
 
 **Change of 2026-09-19 — the fit probe becomes a smoke test.** §25.2's probe asked whether an answer came back within budget. A measured `q4_0` KV cache failure returned a seven-token answer in 1.4 seconds and scored 0 of 60, so the probe passed a configuration that was completely broken. §25.3 replaces it with a correctness smoke test and invariant 44 requires it. Nothing is removed; a check that did not work is replaced by one that does, and §25.3 states plainly what it still cannot catch.
@@ -1402,6 +1405,50 @@ Environment sits directly below CLI so that CI, container, and headless executio
 Security composition is monotonic: lower scopes may tighten but not weaken hard safety constraints (invariant 29). This applies to the environment channel too — an environment variable cannot widen a global deny.
 
 Secrets are resolved independently via Secret Broker and never flow through this chain. A config file may hold a *reference* (`env://NAME`, `secret://...`) but never a literal credential: config files get committed, so a key written there is a key in that repository's history. The loader refuses one and names the field.
+
+### 33.1 Where a credential actually lives
+
+A rule that makes the safe path impractical does not produce safety. It
+produces workarounds.
+
+An earlier revision refused literals in config and left `secret://`
+unimplemented, on the argument that a keychain which silently degrades into a
+file is worse than none. The argument was right. Its effect was that the only
+remaining way to supply a key was an environment variable — invisible, gone
+with the terminal, different on every platform, and impossible for a user with
+several providers to keep straight. The predictable result is a key pasted into
+a project file, which is the outcome the refusal existed to prevent.
+
+So `secret://<name>` resolves from a credential store the CLI writes, at
+`~/.dem/credentials.json`:
+
+- **in the home directory, never a workspace**, so no repository can capture
+  it;
+- **restricted to its owner** where the platform expresses that in a way the
+  process can set — mode 0600 on POSIX; on Windows the file inherits the
+  profile's permissions and `dem auth` says so rather than implying a
+  guarantee the platform did not give;
+- **not encrypted**, and it says that too. Anything decryptable without a
+  passphrase is obfuscation, and a passphrase asked on every call is a password
+  prompt per request. An OS keychain may be added later as its own scheme with
+  a migration, never as a silent upgrade.
+
+`dem auth add <name>` prompts without echo and refuses a key passed as an
+argument, because an argument is in shell history permanently and the user has
+no way to learn that it happened. `dem auth list` shows names and dates and
+never a value or a fragment of one.
+
+**`secret://` never falls back to the environment.** The two schemes name two
+different places and neither stands in for the other; a reference that quietly
+resolved from somewhere else is how a user comes to believe a key is stored
+when it is not. `env://NAME` remains, and is what CI uses, since a pipeline has
+no prompt to answer.
+
+**One credential per provider, by name.** A council draws on models from
+different vendors, so more than one key is the ordinary case rather than an
+edge case. Copying one key into a shared setting loses track of which endpoint
+issued it, which is how a credential is sent to a service that should not have
+it.
 
 A config file that cannot be read or parsed fails the load rather than being skipped. Silently falling back leaves a user believing their settings — including `maxMode` and `remoteEgress` — are in force when they are not.
 

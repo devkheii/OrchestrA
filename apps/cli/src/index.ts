@@ -16,6 +16,7 @@ import type { ProposedChange } from "@dem/engine";
 import type { DaemonHandle, SessionEvent } from "@dem/protocol";
 import { runInteractive } from "./interactive.js";
 import { readLine, runOnce, showLog } from "./commands.js";
+import { runAuth } from "./auth.js";
 
 export { createSession, renderSince, runTurn } from "./session-ui.js";
 export type { Approver, PendingCall } from "./session-ui.js";
@@ -52,6 +53,7 @@ Usage:
   dem run <prompt>     run one prompt to completion and print the answer
   dem log <ses_id>     show what happened in a session
   dem delegate <task>  hand the whole task to an external agent
+  dem auth add <name>  store a credential for a remote provider
   dem models           list providers this daemon can reach
   dem help             show this message
 
@@ -68,9 +70,13 @@ down once instead of re-typing it:
 
   {"baseUrl": "http://127.0.0.1:8099", "model": "qwen-coder"}
 
-Credentials go in the environment, or in config as a reference such as
-"apiKey": "env://ANTHROPIC_API_KEY" — never as a literal, because config
-files get committed.
+Credentials are never written in config as literals, because config files get
+committed. Store one with 'dem auth add <name>' and reference it:
+
+  {"apiKey": "secret://openai"}
+
+An environment variable still works — "apiKey": "env://OPENAI_API_KEY" — which
+is what CI wants, since a pipeline has no prompt to answer.
 
 Status: v0.1 in progress. Permission mode is ASK and cannot be raised:
 no sandbox adapter ships in v0.1, and AUTO without one is not offered.
@@ -144,6 +150,11 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
     case "-h":
       io.out(HELP);
       return 0;
+
+    case "auth":
+      // No daemon and no provider: storing a credential must work before
+      // anything is configured, which is when a user first needs it.
+      return runAuth(rest, io);
 
     case "log": {
       const id = rest[0];
