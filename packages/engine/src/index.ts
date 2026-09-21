@@ -13,6 +13,7 @@ export * from "./compaction/checkpoint.js";
 export * from "./tools/patch.js";
 export * from "./tools/shell.js";
 export * from "./tools/registry.js";
+export * from "./tools/search.js";
 export * from "./tools/terminal.js";
 export * from "./runtime/kill.js";
 export * from "./memory/store.js";

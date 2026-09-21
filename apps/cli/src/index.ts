@@ -473,6 +473,14 @@ async function startMenu(
   return true;
 }
 
+
+/** Whether ripgrep is available, asked once per run. */
+async function hasRipgrep(): Promise<boolean> {
+  const { execCommand } = await import("@dem/engine");
+  const result = await execCommand("rg", ["--version"], { cwd: process.cwd(), timeoutMs: 5_000 });
+  return !result.failedToStart;
+}
+
 async function withDaemon(
   settings: Settings,
   io: Io,
@@ -604,6 +612,15 @@ async function withDaemon(
     provider = providerFromChosen({ ...chosen, toolCalling: false }, settings.allowRemote).provider;
     io.err(
       `[2mthis model cannot call tools, so none are offered[0m\n`,
+    );
+  }
+
+  // ripgrep backs `glob` and `grep` (SPEC 29). Without it both return
+  // nothing, which a model cannot tell from "no matches" — measured, it
+  // repeated the same search twenty times and spent the round budget.
+  if (!(await hasRipgrep())) {
+    io.err(
+      `[2msearch is unavailable: ripgrep is not on PATH, so glob and grep cannot run[0m\n`,
     );
   }
 

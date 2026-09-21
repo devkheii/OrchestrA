@@ -94,7 +94,12 @@ describe("SEC-020: no tool runs without a broker decision", () => {
       const registry = createToolRegistry({ workspace: dir });
       const result = await runToolCall(registry, call("rm_rf", { path: "/" }), ASK);
       expect(result.executed).toBe(false);
-      expect(result.error).toContain("unknown tool");
+      expect(result.decision.outcome).toBe("deny");
+      // The rule is the machine-readable part and is asserted as such; the
+      // message is written for the model and says what tools exist instead,
+      // because "unknown tool: rm_rf" leaves it with nothing but another guess.
+      expect(result.decision.rule).toContain("unknown tool");
+      expect(result.error).toContain("rm_rf");
     });
   });
 

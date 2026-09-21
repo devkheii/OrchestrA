@@ -45,6 +45,10 @@ export async function advanceRun(deps: LoopDeps, id: SessionId): Promise<RunOutc
   const { store, provider, registry, policy, maxRounds, signal } = deps;
   const now = () => new Date().toISOString();
 
+  // Which calls this turn has already made, so a model can be told when it is
+  // repeating itself rather than discovering something.
+  const seen = new Map<string, number>();
+
   for (let round = 0; round < maxRounds; round++) {
     if (signal.aborted) return { status: "cancelled" };
 
@@ -54,7 +58,7 @@ export async function advanceRun(deps: LoopDeps, id: SessionId): Promise<RunOutc
     // model for anything new: the user answered, so honour it before moving on.
     const approved = pendingApprovedCall(events);
     if (approved) {
-      const outcome = await executeAndRecord(deps, id, approved, true);
+      const outcome = await executeAndRecord(deps, id, approved, true, seen);
       if (outcome) return outcome;
       continue;
     }
@@ -145,7 +149,7 @@ export async function advanceRun(deps: LoopDeps, id: SessionId): Promise<RunOutc
     }
 
     for (const call of calls) {
-      const outcome = await executeAndRecord(deps, id, call, false);
+      const outcome = await executeAndRecord(deps, id, call, false, seen);
       if (outcome) return outcome;
     }
   }
@@ -158,11 +162,37 @@ export async function advanceRun(deps: LoopDeps, id: SessionId): Promise<RunOutc
 }
 
 /** Runs one call through the broker and records it. Returns a stop, or undefined to continue. */
+
+/**
+ * What to tell a model that has made this exact call before (SPEC 22.1).
+ *
+ * Measured: with search working and returning the right answer, an 8B model
+ * made the identical `glob` call six times in one turn and never answered the
+ * question. The harness cannot make a model reason better, but it can stop
+ * letting it treat a repeated call as new information - the one thing it
+ * plainly does not know.
+ *
+ * Not a refusal. The result is still returned; this is added to it.
+ *
+ * @param count how many times this exact call has been made this turn.
+ */
+export function repeatNotice(count: number): string | undefined {
+  if (count < 2) return undefined;
+  if (count === 2) {
+    return "(You already made this exact call and got this exact result. " +
+      "You have this information - answer the question, or try something different.)";
+  }
+  return `(You have now made this exact call ${count} times and received the same ` +
+    `result every time. Repeating it will not produce anything new. Answer the ` +
+    `question with what you have, or say what is missing.)`;
+}
+
 async function executeAndRecord(
   deps: LoopDeps,
   id: SessionId,
   call: ToolCall,
   approved: boolean,
+  seen?: Map<string, number>,
 ): Promise<RunOutcome | undefined> {
   const { store, registry, policy } = deps;
   const now = () => new Date().toISOString();
@@ -177,6 +207,16 @@ async function executeAndRecord(
   });
 
   const result = await runToolCall(registry, call, { ...policy, approved });
+
+  // Counted per turn, so a re-read after an edit in a later turn is not
+  // treated as repetition.
+  const repeatKey = `${call.name}:${JSON.stringify(call.arguments)}`;
+  const seenCount = (seen?.get(repeatKey) ?? 0) + 1;
+  seen?.set(repeatKey, seenCount);
+  const notice = repeatNotice(seenCount);
+  if (notice && result.executed && typeof result.output === "string") {
+    result.output = `${result.output}\n\n${notice}`;
+  }
 
   await store.append(id, {
     type: "permission.resolved",

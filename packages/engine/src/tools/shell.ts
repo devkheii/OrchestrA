@@ -32,6 +32,17 @@ export interface ExecResult {
   timedOut: boolean;
   aborted: boolean;
   truncated: boolean;
+  /**
+   * The command never ran — usually because the binary is not installed.
+   *
+   * Distinct from running and producing nothing, which is what it looked like
+   * before: the spawn error was discarded and the caller got `code: null` with
+   * empty output. `rg` missing from PATH made `glob` and `grep` return the
+   * empty string on every call, and a model given an empty string cannot tell
+   * "no matches" from "this tool is broken" — so it asked again, twenty times,
+   * until the round budget ended the turn.
+   */
+  failedToStart?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -95,6 +106,8 @@ export function execCommand(
     };
     options.signal?.addEventListener("abort", onAbort, { once: true });
 
+    let startError: string | undefined;
+
     const finish = (code: number | null) => {
       if (settled) return;
       settled = true;
@@ -104,17 +117,23 @@ export function execCommand(
       const values = options.redactValues ?? [];
       resolve({
         code,
+        ...(startError ? { failedToStart: true } : {}),
         // Redaction happens here, at the boundary, so no downstream caller has
         // to remember. Tool output goes to the model and to the audit log.
         stdout: redact(stdout, values),
-        stderr: redact(stderr, values),
+        // The spawn error belongs in stderr: it is what went wrong, and a
+        // caller reading stderr is a caller who wants to know.
+        stderr: redact(startError ? `${stderr}${startError}` : stderr, values),
         timedOut,
         aborted,
         truncated,
       });
     };
 
-    child.on("error", () => finish(null));
+    child.on("error", (err) => {
+      startError = `could not run ${command}: ${err.message}`;
+      finish(null);
+    });
     child.on("close", (code) => finish(code));
   });
 }

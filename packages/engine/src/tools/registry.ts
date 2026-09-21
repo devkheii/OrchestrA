@@ -4,6 +4,7 @@ import { decide, segmentCommand } from "../permissions/broker.js";
 import { resolveWorkspacePath } from "../policy/path-guard.js";
 import { applyPatch, hashFile } from "./patch.js";
 import { execCommand } from "./shell.js";
+import { findFiles, findInFiles, type SearchOutcome } from "./search.js";
 
 /**
  * The tool surface, and the single way in (invariant 36, test SEC-020).
@@ -61,6 +62,35 @@ const str = (args: Record<string, unknown>, key: string): string => {
   return value;
 };
 
+
+/**
+ * What a search tells the model.
+ *
+ * Three outcomes that used to look identical, because all three produced the
+ * empty string:
+ *
+ *   the binary is not installed
+ *   it ran and matched nothing
+ *   it ran and matched something
+ *
+ * Only the third is useful as-is, and only the second is a reason to try a
+ * different pattern. A model handed "" cannot tell them apart, so it repeats
+ * itself — measured: twenty identical `glob` calls until the round budget
+ * ended the turn.
+ *
+ * The same rule this harness already applies to requests and to streams: an
+ * empty result is not an answer.
+ */
+function describeSearch(found: SearchOutcome, what: string): string {
+  const output = found.text.trim();
+  // An empty result is not an answer. A model handed "" cannot tell "no
+  // matches" from "this tool is broken", so it repeats itself — measured,
+  // twenty identical searches until the round budget ended the turn. The same
+  // rule this harness already applies to requests and to streams.
+  if (!output) return `no ${what}`;
+  return found.text;
+}
+
 export function createToolRegistry(context: ToolContext): ToolRegistry {
   const specs: ToolSpec[] = [
     {
@@ -103,12 +133,9 @@ export function createToolRegistry(context: ToolContext): ToolRegistry {
         const target = typeof args["path"] === "string" ? args["path"] : ".";
         const { realPath } = await resolveWorkspacePath(ctx.workspace, target);
         // ripgrep rather than our own walker (SPEC section 29).
-        const result = await execCommand("rg", ["--line-number", str(args, "pattern"), realPath], {
-          cwd: ctx.workspace,
-          ...(ctx.redactValues ? { redactValues: ctx.redactValues } : {}),
-        });
-        // rg exits 1 for "no matches", which is an answer, not a failure.
-        return result.code === 0 || result.code === 1 ? result.stdout : result.stderr;
+        const pattern = str(args, "pattern");
+        const found = await findInFiles(ctx.workspace, pattern, realPath, ctx.redactValues);
+        return describeSearch(found, `matches for ${pattern} in ${target}`);
       },
     },
     {
@@ -122,10 +149,9 @@ export function createToolRegistry(context: ToolContext): ToolRegistry {
         additionalProperties: false,
       },
       async run(args, ctx) {
-        const result = await execCommand("rg", ["--files", "--glob", str(args, "pattern")], {
-          cwd: ctx.workspace,
-        });
-        return result.stdout;
+        const pattern = str(args, "pattern");
+        const found = await findFiles(ctx.workspace, pattern);
+        return describeSearch(found, `files matching ${pattern}`);
       },
     },
     {
@@ -214,6 +240,19 @@ export function createToolRegistry(context: ToolContext): ToolRegistry {
  * whole call: `echo safe && rm -rf /` is one approval in the user's eyes and
  * two commands in the shell's, and the user approved what they read.
  */
+
+/** The parameters a tool takes, for an error a model can act on. */
+function describeParameters(spec: ToolSpec): string {
+  const properties = (spec.parameters["properties"] ?? {}) as Record<string, unknown>;
+  const required = new Set((spec.parameters["required"] ?? []) as string[]);
+  const names = Object.keys(properties);
+  if (names.length === 0) return "no arguments";
+
+  return names
+    .map((name) => (required.has(name) ? name : `${name} (optional)`))
+    .join(", ");
+}
+
 export async function runToolCall(
   registry: ToolRegistry,
   call: { id: string; name: string; arguments: Record<string, unknown> },
@@ -222,10 +261,13 @@ export async function runToolCall(
   const spec = registry.get(call.name);
 
   if (!spec) {
+    // Naming what exists, because "unknown tool: hash" leaves a model with
+    // nothing but another guess — measured, it went back to guessing.
+    const available = registry.list().map((s) => s.name).join(", ");
     return {
       decision: { outcome: "deny", rule: `unknown tool: ${call.name}` },
       executed: false,
-      error: `unknown tool: ${call.name}`,
+      error: `there is no tool called ${call.name}. Available: ${available}.`,
     };
   }
 
@@ -243,7 +285,16 @@ export async function runToolCall(
   } catch (err) {
     // A failed tool is a result the model should see and react to, not an
     // exception that unwinds the session.
-    return { decision, executed: false, error: (err as Error).message };
+    // Named, because a model reading "path must be a string" has no idea
+    // which of six tools said it or what the parameter is for. Measured: a
+    // model called `hash` with no arguments, got exactly that, and went back
+    // to guessing.
+    return {
+      decision,
+      executed: false,
+      error: `${spec.name}: ${(err as Error).message}. ` +
+        `It takes ${describeParameters(spec)}.`,
+    };
   }
 }
 

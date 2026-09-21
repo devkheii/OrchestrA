@@ -9,6 +9,7 @@
 
 export { startDaemon } from "./server.js";
 export { providerFromChosen, providerFromSettings, resolveProvider } from "./provider-config.js";
+export { repeatNotice } from "./agent-loop.js";
 export type { ProviderEnv, ProviderSelection } from "./provider-config.js";
 export {
   bearerFrom,
