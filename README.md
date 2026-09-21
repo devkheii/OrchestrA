@@ -69,6 +69,26 @@ dem setup                # find a model and write the config
 dem auth add <name>      # store a credential for a remote provider
 ```
 
+Inside a session, the commands print on entry rather than hiding behind
+`/help`:
+
+```
+/model [name]                          see or change which model this provider is asked for
+/provider [name | add | remove <name>] choose, add or remove a provider
+/session                               the current session id
+/new                                   a fresh session
+/help                                  this list
+/exit                                  leave
+```
+
+`/provider add` asks for a name, an endpoint and a key, stores the key in the
+credential store and writes only `secret://<name>` into config. `/model` with
+no argument asks the endpoint what it serves and marks the one in use.
+
+They write to the same `.dem/config.json` that `dem setup` and your editor
+write — there is no session-only state — and a change takes effect on the next
+run, which the session tells you rather than pretending otherwise.
+
 An interactive session holds one session id for the whole conversation, so a
 follow-up builds on what came before rather than starting cold. `/new` discards
 it, `/session` prints the id, `/exit` leaves.
