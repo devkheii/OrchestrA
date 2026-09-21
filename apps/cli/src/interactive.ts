@@ -2,6 +2,7 @@ import { createInterface } from "node:readline/promises";
 import type { DaemonHandle } from "@dem/protocol";
 import type { Settings } from "@dem/engine";
 import { createSession, runTurn, type Approver, type Io } from "./session-ui.js";
+import { runSessionCommand, SESSION_COMMANDS } from "./session-commands.js";
 
 /**
  * The interactive session (plan 4.5).
@@ -20,16 +21,17 @@ const BANNER = (settings: Settings, workspace: string, local: boolean, label: st
     "",
     `[1mdem[0m  ${workspace}`,
     `${local ? "[2mLOCAL [0m" : "[1mREMOTE[0m"}  ${label}`,
-    `[2mmode ${settings.security.maxMode}  ·  /help for commands, /exit to leave[0m`,
+    `[2mmode ${settings.security.maxMode}[0m`,
+    "",
+    // Every command, every time, rather than a pointer to /help. A session
+    // whose capabilities are discoverable only by typing the right word is
+    // one where most people never learn it can change models at all.
+    ...SESSION_COMMANDS.map(
+      (c) => `  [2m${(c.usage ?? c.name).padEnd(34)}${c.summary}[0m`,
+    ),
     "",
   ].join("\n");
 
-const COMMANDS = `
-  /new      start a fresh session, discarding this conversation
-  /session  show the current session id
-  /help     this list
-  /exit     leave
-`;
 
 /** Reads one line of an answer. Injected so the prompt can be tested. */
 export type Ask = (question: string) => Promise<string>;
@@ -108,22 +110,33 @@ export async function runInteractive(
       if (!line) continue;
 
       if (line.startsWith("/")) {
-        if (line === "/exit" || line === "/quit") return 0;
-        if (line === "/help") {
-          io.err(COMMANDS);
-          continue;
-        }
+        // Session-scoped first, then the shared handler. Splitting them this
+        // way keeps `dem` and any later shell answering the same words.
         if (line === "/session") {
-          io.err(`${sessionId}\n`);
+          io.err(`${sessionId}
+`);
           continue;
         }
         if (line === "/new") {
           sessionId = await createSession(daemon, workspace);
           seq = 0;
-          io.err(`[2mnew session ${sessionId}[0m\n`);
+          io.err(`[2mnew session ${sessionId}[0m
+`);
           continue;
         }
-        io.err(`unknown command ${line}${COMMANDS}`);
+
+        const result = await runSessionCommand(line, {
+          workspace,
+          io,
+          ask: (question: string) => rl.question(question),
+        });
+        if (result.exit) return 0;
+        if (result.changed) {
+          // The daemon was started with the old provider. Saying so is honest
+          // and cheap; reconnecting mid-session is not, and pretending the
+          // change took effect would be worse than either.
+          io.err("[2mwritten - restart dem for it to take effect[0m\n");
+        }
         continue;
       }
 

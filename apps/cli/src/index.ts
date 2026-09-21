@@ -23,6 +23,8 @@ import { runSetup, SETUP_DONE } from "./setup.js";
 export { createSession, renderSince, runTurn } from "./session-ui.js";
 export type { Approver, PendingCall } from "./session-ui.js";
 export { sessionApprover } from "./interactive.js";
+export { runSessionCommand, SESSION_COMMANDS } from "./session-commands.js";
+export type { SessionCommand, SessionCommandResult } from "./session-commands.js";
 export type { Ask } from "./interactive.js";
 
 /**

@@ -1643,6 +1643,55 @@ edge case. Copying one key into a shared setting loses track of which endpoint
 issued it, which is how a credential is sent to a service that should not have
 it.
 
+### 33.4 Configuration from inside the session
+
+§33.3 covered the first minute and then stopped mattering. Changing a model,
+adding a second provider, or correcting a mistyped endpoint meant leaving the
+session, editing JSON by hand, and starting again — so the harness was
+configurable exactly once, at the moment its user knew least about what they
+wanted.
+
+The session answers for itself:
+
+```text
+/model [name]                          see or change which model this provider is asked for
+/provider [name | add | remove <name>] choose, add or remove a provider
+/session                               the current session id
+/new                                   a fresh session
+/help                                  this list
+/exit                                  leave
+```
+
+**The list is printed on entry, not hidden behind `/help`.** A session whose
+capabilities are discoverable only by typing the right word is one where most
+people never learn it can change models at all.
+
+Four things this must not become:
+
+**A second source of truth.** Every command reads and writes the same
+`.dem/config.json` that setup and a text editor write. There is no
+session-only state to lose, for the same reason the CLI renders the daemon's
+event log rather than keeping its own.
+
+**A way to lose settings.** The file is read whole and written whole, so a
+command that changes a provider cannot drop a `security` block someone put
+there deliberately.
+
+**An exception to invariant 6.** `/provider add` prompts for a key and puts it
+in the credential store (§33.1), writing only `secret://<name>` into config.
+A credential already stored is reported and kept rather than silently
+overwritten.
+
+**A change that claims more than it did.** The daemon was started with the old
+provider, so a change takes effect on the next run and the session says so.
+Reconnecting mid-session is not free, and pretending the change applied would
+be worse than either.
+
+A model name is written to the *selected provider's* entry when one is
+selected, and at the top level otherwise — writing it to the top level while a
+named provider is active would set a value that entry overrides, so the change
+would appear to do nothing.
+
 ### 33.3 The first minute
 
 A harness that cannot be configured has no users, and configuration was the
