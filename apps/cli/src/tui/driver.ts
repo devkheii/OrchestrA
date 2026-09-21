@@ -1,7 +1,8 @@
 import type { DaemonHandle } from "@dem/protocol";
 import type { Settings } from "@dem/engine";
 import { createSession, runTurn, type Approver, type Io } from "../session-ui.js";
-import { runSessionCommand } from "../session-commands.js";
+import { runSessionCommand, type CommandOption } from "../session-commands.js";
+import { discoverServers, discoverWeights, humanSize, labelForModels } from "@dem/engine";
 import { appendDelta, line, settle, trim, type Prompt, type SessionState } from "./state.js";
 
 /**
@@ -17,6 +18,20 @@ import { appendDelta, line, settle, trim, type Prompt, type SessionState } from 
  * once has two readers on one stdin, which looks to a user like keystrokes
  * being swallowed.
  */
+
+/** A menu entry that means "changed my mind", distinct from any real value. */
+const CANCEL = "\u0000cancel";
+
+/**
+ * The listing endpoint, for both ways a baseUrl gets written.
+ *
+ * The same trap the adapter fell into: a configured URL usually already ends
+ * in /v1, and appending another asks for /v1/v1/models.
+ */
+function modelsUrl(baseUrl: string): string {
+  const base = baseUrl.replace(/\/+$/, "");
+  return /\/v\d+$/.test(base) ? `${base}/models` : `${base}/v1/models`;
+}
 
 export interface Driver {
   state: SessionState;
@@ -160,6 +175,43 @@ export async function createDriver(options: {
           // on screen afterwards.
           request: { question, secret: /key/i.test(question) },
         }),
+
+      // Arrow keys rather than typing a name back. The whole point of a
+      // renderer is that a list is something you move through.
+      select: async (title, options) => {
+        const chosen = await askThrough({
+          kind: "select",
+          request: { title, options: [...options, { label: "cancel", value: CANCEL }] },
+        });
+        return chosen === CANCEL ? undefined : chosen;
+      },
+
+      // What the endpoint currently serves. Without this `/model` could only
+      // print the name already configured, which is not a list of anything.
+      listModels: async () => {
+        const res = await fetch(modelsUrl(settings.baseUrl ?? ""));
+        if (!res.ok) throw new Error(`endpoint returned ${res.status}`);
+        const body = (await res.json()) as { data?: Array<{ id?: string }> };
+        return (body.data ?? []).map((m) => m.id).filter((id): id is string => Boolean(id));
+      },
+
+      // And what else is on this machine, so adding a provider starts from
+      // what is running rather than from a blank field.
+      discover: async (): Promise<CommandOption[]> => {
+        const [servers, weights] = await Promise.all([discoverServers(), discoverWeights()]);
+        return [
+          ...servers.map((server) => ({
+            label: server.kind,
+            value: `${server.baseUrl}/v1`,
+            detail: `${server.baseUrl}  ${labelForModels(server.models)}`,
+          })),
+          ...weights.slice(0, 6).map((found) => ({
+            label: found.path.split(/[\/]/).pop() ?? found.path,
+            value: "http://127.0.0.1:8099",
+            detail: `${humanSize(found.sizeBytes)}  served locally`,
+          })),
+        ];
+      },
     });
 
     if (result.exit) {

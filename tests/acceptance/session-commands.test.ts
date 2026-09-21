@@ -287,3 +287,139 @@ async function readCredentialValue(home: string): Promise<string | undefined> {
   const { readCredential } = await import("@dem/engine");
   return readCredential("openai", home);
 }
+
+describe("Picking from a list rather than typing a name", () => {
+  /**
+   * Reported from a real session: "모델이던 프로바이더든 어떤게 있는지 리스트도
+   * 안나오고" — neither models nor providers were listed.
+   *
+   * Two separate gaps. `/model` was never given a way to ask the endpoint what
+   * it serves, so it printed the current name and stopped. And `/provider`
+   * listed what was already configured, which on a fresh setup is nothing,
+   * while a running Ollama and four sets of weights sat undiscovered on the
+   * same machine.
+   *
+   * Both are now lists, and a list in a TUI is something you arrow through.
+   */
+
+  /** Stands in for the arrow-key picker; records what it was offered. */
+  function picker(choose: (options: { value: string }[]) => string | undefined) {
+    const offered: { title: string; options: { label: string; value: string }[] }[] = [];
+    return {
+      offered,
+      select: async (title: string, options: { label: string; value: string }[]) => {
+        offered.push({ title, options });
+        return choose(options);
+      },
+    };
+  }
+
+  it("offers the endpoint's models and writes the one chosen", async () => {
+    await withTempDir(async (workspace) => {
+      await writeConfig(workspace, { baseUrl: "http://127.0.0.1:1/v1", model: "old" });
+      const pick = picker((options) => options.find((o) => o.value === "beta")?.value);
+
+      const result = await runSessionCommand("/model", {
+        workspace,
+        io: capture().io,
+        ask: scripted([]),
+        select: pick.select,
+        listModels: async () => ["old", "beta", "gamma"],
+      });
+
+      expect(pick.offered[0]!.options.map((o) => o.value)).toEqual(["old", "beta", "gamma"]);
+      expect(result.changed).toBe(true);
+      expect((await readConfig(workspace))["model"]).toBe("beta");
+    });
+  });
+
+  it("changes nothing when the pick is cancelled", async () => {
+    await withTempDir(async (workspace) => {
+      await writeConfig(workspace, { baseUrl: "http://127.0.0.1:1/v1", model: "old" });
+      const result = await runSessionCommand("/model", {
+        workspace, io: capture().io, ask: scripted([]),
+        select: async () => undefined,
+        listModels: async () => ["old", "beta"],
+      });
+
+      expect(result.changed).toBe(false);
+      expect((await readConfig(workspace))["model"]).toBe("old");
+    });
+  });
+
+  it("offers configured providers plus a way to add one", async () => {
+    await withTempDir(async (workspace) => {
+      await writeConfig(workspace, {
+        provider: "a",
+        providers: { a: { baseUrl: "http://10.0.0.1/v1" }, b: { baseUrl: "http://10.0.0.2/v1" } },
+      });
+      const pick = picker((options) => options.find((o) => o.value === "b")?.value);
+
+      const result = await runSessionCommand("/provider", {
+        workspace, io: capture().io, ask: scripted([]), select: pick.select,
+      });
+
+      const values = pick.offered[0]!.options.map((o) => o.value);
+      expect(values).toContain("a");
+      expect(values).toContain("b");
+      // Adding one has to be reachable from the list, or a user with no
+      // providers configured is shown an empty menu and no way forward.
+      // Asserted on the label, since the value is a sentinel chosen not to
+      // collide with a provider someone named "add".
+      expect(pick.offered[0]!.options.some((o) => /add/i.test(o.label))).toBe(true);
+      expect(result.changed).toBe(true);
+      expect((await readConfig(workspace))["provider"]).toBe("b");
+    });
+  });
+
+  it("offers what is on the machine when adding, not just a blank form", async () => {
+    await withTempDir(async (home) => {
+      await withTempDir(async (workspace) => {
+        const pick = picker((options) => options[0]?.value);
+
+        await runSessionCommand("/provider add", {
+          workspace, home, io: capture().io,
+          ask: scripted(["ollama", "n"]),
+          select: pick.select,
+          discover: async () => [
+            { label: "Ollama — qwen", value: "http://127.0.0.1:11434/v1", detail: "running" },
+          ],
+        });
+
+        expect(pick.offered[0]!.options[0]!.value).toBe("http://127.0.0.1:11434/v1");
+        const config = await readConfig(workspace);
+        const entry = (config["providers"] as Record<string, Record<string, unknown>>)["ollama"];
+        expect(entry?.["baseUrl"]).toBe("http://127.0.0.1:11434/v1");
+      });
+    });
+  });
+
+  it("still lets an endpoint be typed when nothing was found", async () => {
+    await withTempDir(async (home) => {
+      await withTempDir(async (workspace) => {
+        await runSessionCommand("/provider add", {
+          workspace, home, io: capture().io,
+          ask: scripted(["manual", "https://api.example.com/v1", "m", "n"]),
+          select: async () => undefined,
+          discover: async () => [],
+        });
+
+        const config = await readConfig(workspace);
+        const entry = (config["providers"] as Record<string, Record<string, unknown>>)["manual"];
+        expect(entry?.["baseUrl"]).toBe("https://api.example.com/v1");
+      });
+    });
+  });
+
+  it("falls back to printing when there is no picker", async () => {
+    // The plain session and any non-interactive caller still work.
+    await withTempDir(async (workspace) => {
+      await writeConfig(workspace, { baseUrl: "http://127.0.0.1:1/v1", model: "old" });
+      const c = capture();
+      await runSessionCommand("/model", {
+        workspace, io: c.io, ask: scripted([]), listModels: async () => ["old", "beta"],
+      });
+      expect(text(c)).toContain("beta");
+    });
+  });
+});

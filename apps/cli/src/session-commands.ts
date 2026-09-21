@@ -21,10 +21,30 @@ import type { Io } from "./session-ui.js";
 
 export type Ask = (question: string) => Promise<string>;
 
+/** One entry in a pick-from-a-list prompt. */
+export interface CommandOption {
+  label: string;
+  value: string;
+  detail?: string;
+  current?: boolean;
+}
+
+/**
+ * Offer a list and return what was chosen, or undefined if it was cancelled.
+ *
+ * Absent in a plain terminal and in tests that do not need it, and then every
+ * list is printed and a name is typed instead. A command that only works with
+ * a renderer is a command the non-interactive paths lose.
+ */
+export type Select = (title: string, options: CommandOption[]) => Promise<string | undefined>;
+
 export interface SessionCommandContext {
   workspace: string;
   io: Io;
   ask: Ask;
+  select?: Select;
+  /** What is on this machine, for adding a provider without typing a URL. */
+  discover?: () => Promise<CommandOption[]>;
   /** Home directory holding the credential store. Injected so tests can move it. */
   home?: string;
   /** What the current endpoint reports. Injected so a test needs no server. */
@@ -60,6 +80,10 @@ export const SESSION_COMMANDS: readonly SessionCommand[] = [
   { name: "/help", summary: "this list" },
   { name: "/exit", summary: "leave" },
 ];
+
+/** Menu entries that are actions rather than values. */
+const ADD = "\u0000add";
+const MANUAL = "\u0000manual";
 
 const B = "\u001b[1m";
 const D = "\u001b[2m";
@@ -144,8 +168,9 @@ async function provider(
     return { handled: true, changed: true };
   }
 
-  // No argument: show what there is.
-  if (names.length === 0) {
+  // No argument: show what there is. With a picker, an empty list is still a
+  // menu with "add" in it, so this shortcut only applies without one.
+  if (names.length === 0 && !context.select) {
     const flat = config["baseUrl"];
     context.io.err(
       flat
@@ -155,13 +180,31 @@ async function provider(
     return { handled: true, changed: false };
   }
 
+  const options: CommandOption[] = names.map((entry) => ({
+    label: entry,
+    value: entry,
+    detail: [providers[entry]?.["model"], providers[entry]?.["baseUrl"]].filter(Boolean).join("  "),
+    ...(entry === current ? { current: true } : {}),
+  }));
+  // Adding has to be reachable from the list itself, or someone with none
+  // configured sees an empty menu and no way forward.
+  options.push({ label: "add a provider...", value: ADD });
+
+  if (context.select) {
+    const chosen = await context.select("providers", options);
+    if (chosen === undefined) return { handled: true, changed: false };
+    if (chosen === ADD) return addProvider(config, context);
+
+    config["provider"] = chosen;
+    await save(context.workspace, config);
+    context.io.err(`now using ${B}${chosen}${R}\n`);
+    return { handled: true, changed: true };
+  }
+
   context.io.err("\n");
-  for (const entry of names) {
-    const detail = [providers[entry]?.["model"], providers[entry]?.["baseUrl"]]
-      .filter(Boolean)
-      .join("  ");
-    const mark = entry === current ? `  ${B}• current${R}` : "";
-    context.io.err(`  ${B}${entry.padEnd(16)}${R}${D}${detail}${R}${mark}\n`);
+  for (const option of options) {
+    const mark = option.current ? `  ${B}• current${R}` : "";
+    context.io.err(`  ${B}${option.label.padEnd(16)}${R}${D}${option.detail ?? ""}${R}${mark}\n`);
   }
   context.io.err(`\n${D}/provider <name> to switch  ·  /provider add  ·  /provider remove <name>${R}\n`);
   return { handled: true, changed: false };
@@ -179,7 +222,23 @@ async function addProvider(
     return { handled: true, changed: false };
   }
 
-  const baseUrl = (await context.ask("endpoint URL: ")).trim();
+  let baseUrl = "";
+
+  // What is already on the machine, offered before a blank field. Typing a URL
+  // is the fallback, not the first thing asked of someone with a server
+  // already running.
+  if (context.select && context.discover) {
+    const found = await context.discover();
+    if (found.length) {
+      const chosen = await context.select("endpoint", [
+        ...found,
+        { label: "type one myself...", value: MANUAL },
+      ]);
+      if (chosen !== undefined && chosen !== MANUAL) baseUrl = chosen;
+    }
+  }
+
+  if (!baseUrl) baseUrl = (await context.ask("endpoint URL: ")).trim();
   if (!baseUrl) {
     context.io.err("an endpoint is required\n");
     return { handled: true, changed: false };
@@ -263,6 +322,23 @@ async function model(
   if (available.length === 0) {
     context.io.err(`\n${D}the endpoint reports no models${R}\n`);
     return { handled: true, changed: false };
+  }
+
+  if (context.select) {
+    const chosen = await context.select(
+      "models",
+      available.map((entry) => ({
+        label: entry,
+        value: entry,
+        ...(entry === current ? { current: true } : {}),
+      })),
+    );
+    if (chosen === undefined) return { handled: true, changed: false };
+
+    target["model"] = chosen;
+    await save(context.workspace, config);
+    context.io.err(`model is now ${B}${chosen}${R}\n`);
+    return { handled: true, changed: true };
   }
 
   context.io.err("\n");
