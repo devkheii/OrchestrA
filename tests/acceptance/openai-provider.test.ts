@@ -359,3 +359,61 @@ describe("A baseUrl that already names a version path", () => {
     }
   });
 });
+
+describe("An incomplete stream ends the turn rather than being retried", () => {
+  /**
+   * A retry was implemented here and removed, and the reason is worth keeping.
+   *
+   * A truncated stream is not proof the server is gone: measured, the server
+   * was alive and answering immediately afterwards, and what had ended the
+   * stream was the model beginning a tool call the server could not parse. A
+   * second attempt might well have worked.
+   *
+   * But retrying means buffering the whole turn so the abandoned attempt can
+   * be discarded, and buffering is not streaming - the session would show
+   * nothing until the answer was complete. The abort test above is what caught
+   * that, by noticing the caller could no longer stop mid-stream.
+   *
+   * Retrying without buffering is worse: the deltas already emitted are
+   * already in the event log, and a second attempt appended after them reads
+   * as the model having said both things.
+   *
+   * So the turn ends and says why. Asking again is one keystroke; a corrupted
+   * record is permanent.
+   */
+  it("reports the truncation without a second request", async () => {
+    let attempts = 0;
+    const endpoint = await startFakeOpenAI({
+      onRequest: () => {
+        attempts += 1;
+        return { rawLines: [`data: ${JSON.stringify(delta("half"))}`] };
+      },
+    });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: endpoint.url, model: "m" });
+      const events = await collect(provider.run({ messages: [{ role: "user", content: "x" }] }));
+
+      expect(events.some((e) => e.type === "error")).toBe(true);
+      expect(attempts).toBe(1);
+      // What did arrive is still delivered: it is what the model said.
+      expect(events).toContainEqual({ type: "delta", text: "half" });
+    } finally {
+      await endpoint.close();
+    }
+  });
+
+  it("does not claim to know why the stream ended", async () => {
+    // An earlier message asserted the server had died. It had not.
+    const endpoint = await startFakeOpenAI({ rawLines: [] });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: endpoint.url, model: "m" });
+      const events = await collect(provider.run({ messages: [{ role: "user", content: "x" }] }));
+      const error = events.find((e) => e.type === "error") as { message: string };
+
+      expect(error.message).toMatch(/may have/i);
+      expect(error.message).not.toMatch(/most likely died/i);
+    } finally {
+      await endpoint.close();
+    }
+  });
+});

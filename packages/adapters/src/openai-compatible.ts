@@ -102,6 +102,24 @@ export class OpenAICompatibleProvider implements Provider {
     }
   }
 
+  /**
+   * One turn, streamed.
+   *
+   * A retry was tried here and removed. When a stream ends without finishing,
+   * the server is often still alive — measured — and the cause was the model
+   * beginning a tool call the server could not parse, which a second attempt
+   * might well survive. But retrying means buffering the whole turn so the
+   * abandoned attempt can be discarded, and buffering is not streaming: the
+   * session would show nothing until the answer was complete.
+   *
+   * Retrying without buffering is worse still. The deltas already emitted are
+   * already in the event log, and a second attempt appended after them reads
+   * as the model having said both things — which is the fabrication this
+   * harness exists to prevent.
+   *
+   * So the turn ends and says why. Asking again is one keystroke; a corrupted
+   * record is permanent.
+   */
   async *run(request: ModelRequest, context?: RunContext): AsyncIterable<ModelEvent> {
     const signal = context?.signal;
 
@@ -257,8 +275,13 @@ export class OpenAICompatibleProvider implements Provider {
         message:
           `the model server ended the stream without finishing it, after ` +
           `${answerChars} characters of answer and ${rationaleChars} of reasoning. ` +
-          `It most likely died mid-generation — a configuration that loads and ` +
-          `answers a short prompt can still run out of memory once the context fills.`,
+          // No guess at the cause. An earlier version asserted the server had
+          // died; when this was next seen the server was alive and answering,
+          // and the real trigger was the model starting to emit a tool call
+          // the server could not parse mid-stream. A confident wrong diagnosis
+          // sends someone to fix the wrong thing.
+          `The server may have stopped, or may have failed to parse what the ` +
+          `model was producing. The response is incomplete either way.`,
       };
       return;
     }
@@ -359,6 +382,7 @@ async function* sseFrames(
  * 404 on everything — a setup wizard writing a configuration that could not
  * work, which is the opposite of what it is for.
  */
+
 function apiUrl(baseUrl: string, path: string): string {
   const base = trimEnd(baseUrl);
   return /\/v\d+$/.test(base) ? `${base}/${path}` : `${base}/v1/${path}`;

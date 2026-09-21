@@ -26,6 +26,13 @@ export interface FakeEndpointOptions {
   errorStatus?: number;
   /** Milliseconds between frames, so a test can cancel mid-stream. */
   frameDelayMs?: number;
+  /**
+   * Answer each request differently, for retry behaviour.
+   *
+   * Returns the options to use for that one request, so a test can make the
+   * first attempt fail and the second succeed.
+   */
+  onRequest?: () => Partial<FakeEndpointOptions>;
 }
 
 export async function startFakeOpenAI(options: FakeEndpointOptions = {}): Promise<FakeEndpoint> {
@@ -45,8 +52,10 @@ export async function startFakeOpenAI(options: FakeEndpointOptions = {}): Promis
       return;
     }
 
-    if (options.errorStatus !== undefined) {
-      res.writeHead(options.errorStatus, { "content-type": "application/json" });
+    const perRequest = options.onRequest ? { ...options, ...options.onRequest() } : options;
+
+    if (perRequest.errorStatus !== undefined) {
+      res.writeHead(perRequest.errorStatus, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: { message: "upstream refused" } }));
       return;
     }
@@ -57,15 +66,15 @@ export async function startFakeOpenAI(options: FakeEndpointOptions = {}): Promis
       connection: "keep-alive",
     });
 
-    const lines = options.rawLines ?? [
-      ...(options.frames ?? []).map((f) => `data: ${JSON.stringify(f)}`),
+    const lines = perRequest.rawLines ?? [
+      ...(perRequest.frames ?? []).map((f) => `data: ${JSON.stringify(f)}`),
       "data: [DONE]",
     ];
 
     for (const line of lines) {
       if (res.writableEnded || res.destroyed) return;
       res.write(line + "\n\n");
-      if (options.frameDelayMs) await sleep(options.frameDelayMs);
+      if (perRequest.frameDelayMs) await sleep(perRequest.frameDelayMs);
     }
     res.end();
   });
