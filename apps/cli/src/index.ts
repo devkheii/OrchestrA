@@ -1,6 +1,9 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { providerFromChosen, providerFromSettings, startDaemon } from "@dem/daemon";
+// `providerFromSettings` is deliberately not imported: resolving the
+// provider a second time, from the flat settings, is what printed "fake
+// (no provider configured)" over a session answering from a real model.
+import { providerFromChosen, startDaemon } from "@dem/daemon";
 import {
   applyDelegated,
   delegate,
@@ -197,15 +200,14 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
         settings = await settingsFor(rawArgv);
       }
 
-      return withDaemon(settings, io, (daemon, endpoint) => {
-        const selection = providerFromSettings(settings);
+      return withDaemon(settings, io, (daemon, endpoint) =>
         // The full-screen session. `runInteractive` remains the line-based
         // one, used where a renderer cannot run — a dumb terminal, a CI log —
         // and both drive the same turn, approval and command code.
-        return process.env["DEM_PLAIN"]
-          ? runInteractive(daemon, settings, process.cwd(), selection.local, selection.label, io)
-          : runTui(daemon, settings, process.cwd(), selection.local, selection.label, endpoint);
-      });
+        process.env["DEM_PLAIN"]
+          ? runInteractive(daemon, settings, process.cwd(), endpoint.local, endpoint.label, io)
+          : runTui(daemon, settings, process.cwd(), endpoint.local, endpoint.label, endpoint),
+      );
 
     case "help":
     case "--help":
@@ -243,12 +245,11 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
     }
 
     case "models":
-      return withDaemon(settings, io, async (daemon) => {
-        const selection = providerFromSettings(settings);
+      return withDaemon(settings, io, async (daemon, endpoint) => {
         // Privacy posture is stated before the model list, not inferred from
         // it. Whether context leaves the machine is the first thing a user
         // needs to know and the easiest thing to forget you configured.
-        io.out(`${selection.local ? "LOCAL " : "REMOTE"}  ${selection.label}\n\n`);
+        io.out(`${endpoint.local ? "LOCAL " : "REMOTE"}  ${endpoint.label}\n\n`);
 
         const res = await fetch(`${daemon.url}/models`, {
           headers: { authorization: `Bearer ${daemon.token}` },
@@ -477,7 +478,13 @@ async function withDaemon(
   io: Io,
   fn: (
     d: DaemonHandle,
-    endpoint: { baseUrl?: string | undefined; apiKey?: string | undefined },
+    endpoint: {
+      baseUrl?: string | undefined;
+      apiKey?: string | undefined;
+      /** What this run is actually talking to, for the header. */
+      label: string;
+      local: boolean;
+    },
   ) => Promise<number>,
 ): Promise<number> {
   const stateDir = defaultStateDir();
@@ -498,9 +505,11 @@ async function withDaemon(
   // exactly as before, from the flat settings.
   let provider;
   let chosen;
+  let selection;
   try {
     chosen = await effectiveProvider(settings);
-    provider = providerFromChosen(chosen, settings.allowRemote).provider;
+    selection = providerFromChosen(chosen, settings.allowRemote);
+    provider = selection.provider;
   } catch (err) {
     io.err(`dem: ${(err as Error).message}\n`);
     return 1;
@@ -602,7 +611,16 @@ async function withDaemon(
   try {
     // The endpoint this run resolved to, handed on so a session command does
     // not have to re-derive it - and get it wrong for a named provider.
-    return await fn(daemon, { baseUrl: chosen.baseUrl, apiKey: chosen.apiKey });
+    // The label and locality come from the selection this run made, not from
+    // a second resolution of the flat settings. Computing it twice printed
+    // "fake (no provider configured)" over a session answering from a real
+    // model, because a named provider leaves the flat fields empty.
+    return await fn(daemon, {
+      baseUrl: chosen.baseUrl,
+      apiKey: chosen.apiKey,
+      label: selection.label,
+      local: selection.local,
+    });
   } catch (err) {
     io.err(`dem: ${(err as Error).message}\n`);
     return 1;
