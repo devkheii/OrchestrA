@@ -20,11 +20,13 @@ import { runTui } from "./tui/index.js";
 import { readLine, runOnce, showLog } from "./commands.js";
 import { runAuth } from "./auth.js";
 import { runSetup, SETUP_DONE } from "./setup.js";
+import { pickAtStart } from "./tui/start.js";
+import { readFile as readConfigFile, writeFile as writeConfigFile, mkdir as makeDir } from "node:fs/promises";
 
 export { createSession, renderSince, runTurn } from "./session-ui.js";
 export type { Approver, PendingCall } from "./session-ui.js";
 export { sessionApprover } from "./interactive.js";
-export { runSessionCommand, SESSION_COMMANDS } from "./session-commands.js";
+export { otherProviders, runSessionCommand, SESSION_COMMANDS } from "./session-commands.js";
 export { appendDelta, line, settle, trim } from "./tui/state.js";
 export type { Line, Prompt, SessionState } from "./tui/state.js";
 export type { SessionCommand, SessionCommandResult } from "./session-commands.js";
@@ -181,6 +183,19 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
         if (code !== SETUP_DONE) return code;
         // Straight into the session the user came for. Re-read, because setup
         // just wrote the config this run was started without.
+        settings = await settingsFor(rawArgv);
+      }
+
+      // Choose before connecting.
+      //
+      // Resolving whatever was configured and connecting meant that an
+      // unreachable endpoint produced a check that refused to open a session,
+      // and the only thing that can change the provider lives inside the
+      // session that would not open. Choosing first has nothing to be locked
+      // out of, and it is what someone with several models wants anyway.
+      if (!process.env["DEM_PLAIN"] && !rawArgv.includes("--provider")) {
+        const chosen = await startMenu(process.cwd(), settings, io);
+        if (chosen === undefined) return 0;
         settings = await settingsFor(rawArgv);
       }
 
@@ -373,6 +388,72 @@ async function selectChanges(
       .filter((n: number) => Number.isInteger(n) && n >= 1 && n <= changes.length),
   );
   return changes.filter((_, i) => picked.has(i + 1));
+}
+
+
+/**
+ * The start menu, and writing down what it chose.
+ *
+ * Written to config rather than held for this run only: picking a model is a
+ * decision about this workspace, and a choice that evaporates means making it
+ * again every time.
+ *
+ * @returns undefined when the user left without choosing.
+ */
+async function startMenu(
+  workspace: string,
+  settings: Settings,
+  io: Io,
+): Promise<true | undefined> {
+  const providers = settings.providers ?? {};
+  const names = Object.keys(providers);
+
+  const choice = await pickAtStart({
+    workspace,
+    configured: names.map((name) => ({
+      name,
+      detail: [providers[name]?.model, providers[name]?.baseUrl].filter(Boolean).join("  "),
+      current: name === settings.provider,
+    })),
+    ...(settings.baseUrl
+      ? { flat: { detail: [settings.model, settings.baseUrl].filter(Boolean).join("  ") } }
+      : {}),
+  });
+
+  if (choice.cancelled) return undefined;
+
+  if (choice.setup) {
+    const code = await runSetup(io, workspace);
+    return code === SETUP_DONE ? true : undefined;
+  }
+
+  const path = join(workspace, ".dem", "config.json");
+  let config: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(await readConfigFile(path, "utf8"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) config = parsed;
+  } catch {
+    // No config yet, which a discovered endpoint is about to create.
+  }
+
+  if (choice.provider) {
+    config["provider"] = choice.provider;
+  } else if (choice.newEndpoint) {
+    // A discovered endpoint becomes the flat configuration, and any named
+    // selection is cleared so it does not override what was just chosen.
+    config["baseUrl"] = choice.newEndpoint.baseUrl;
+    if (choice.newEndpoint.model) config["model"] = choice.newEndpoint.model;
+    delete config["provider"];
+    // Weights belong to the endpoint that serves them; a discovered server is
+    // not ours to serve.
+    if (!choice.newEndpoint.baseUrl.includes("127.0.0.1:8099")) delete config["modelPath"];
+  } else {
+    return true; // The flat configuration, already what settings say.
+  }
+
+  await makeDir(join(workspace, ".dem"), { recursive: true });
+  await writeConfigFile(path, JSON.stringify(config, null, 2) + "\n");
+  return true;
 }
 
 async function withDaemon(

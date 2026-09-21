@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { listCredentials, writeCredential } from "@dem/engine";
-import { runSessionCommand, SESSION_COMMANDS } from "@dem/cli";
+import { otherProviders, runSessionCommand, SESSION_COMMANDS } from "@dem/cli";
 import { withTempDir } from "../helpers/temp.js";
 
 /**
@@ -420,6 +420,63 @@ describe("Picking from a list rather than typing a name", () => {
         workspace, io: c.io, ask: scripted([]), listModels: async () => ["old", "beta"],
       });
       expect(text(c)).toContain("beta");
+    });
+  });
+});
+
+describe("A failed check must not be a dead end", () => {
+  /**
+   * Reported from a real session, and the worst kind of bug: correct
+   * behaviour with no way out.
+   *
+   * The configured provider became unreachable, so the configuration check
+   * refused to start a session — correctly. But the only thing that can
+   * change the provider is `/provider`, which lives inside the session. The
+   * user could not get in to fix the reason they could not get in.
+   */
+  it("names the other providers, so the message says what to do", async () => {
+    await withTempDir(async (workspace) => {
+      await writeConfig(workspace, {
+        provider: "dead",
+        providers: {
+          dead: { baseUrl: "http://10.0.0.1/v1" },
+          local: { baseUrl: "http://127.0.0.1:11434/v1" },
+        },
+      });
+
+      const alternatives = await otherProviders(workspace, "dead");
+      expect(alternatives).toEqual(["local"]);
+    });
+  });
+
+  it("says there are none when the broken one is the only one", async () => {
+    await withTempDir(async (workspace) => {
+      await writeConfig(workspace, {
+        provider: "dead",
+        providers: { dead: { baseUrl: "http://10.0.0.1/v1" } },
+      });
+      expect(await otherProviders(workspace, "dead")).toEqual([]);
+    });
+  });
+
+  it("switching away from the broken one works without a session", async () => {
+    // The escape hatch itself: `/provider <name>` has to be usable from the
+    // failure path, not only from inside a session that will not open.
+    await withTempDir(async (workspace) => {
+      await writeConfig(workspace, {
+        provider: "dead",
+        providers: {
+          dead: { baseUrl: "http://10.0.0.1/v1" },
+          local: { baseUrl: "http://127.0.0.1:11434/v1" },
+        },
+      });
+
+      const result = await runSessionCommand("/provider local", {
+        workspace, io: capture().io, ask: scripted([]),
+      });
+
+      expect(result.changed).toBe(true);
+      expect((await readConfig(workspace))["provider"]).toBe("local");
     });
   });
 });

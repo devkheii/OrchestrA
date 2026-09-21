@@ -89,6 +89,20 @@ const B = "\u001b[1m";
 const D = "\u001b[2m";
 const R = "\u001b[0m";
 
+
+/**
+ * The other providers configured here.
+ *
+ * For the message a non-interactive run prints when the selected one cannot
+ * be reached: a failure that does not name the alternatives leaves someone
+ * editing JSON to find out what they already had.
+ */
+export async function otherProviders(workspace: string, exclude?: string): Promise<string[]> {
+  const config = await load(workspace);
+  const providers = (config["providers"] ?? {}) as Record<string, unknown>;
+  return Object.keys(providers).filter((name) => name !== exclude);
+}
+
 export async function runSessionCommand(
   line: string,
   context: SessionCommandContext,
