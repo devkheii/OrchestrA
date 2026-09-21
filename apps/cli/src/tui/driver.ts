@@ -47,8 +47,16 @@ export async function createDriver(options: {
   workspace: string;
   local: boolean;
   label: string;
+  /**
+   * The endpoint this session is actually talking to, already resolved.
+   *
+   * Not `settings.baseUrl`: with a named provider (SPEC 33.2) the endpoint
+   * lives in that provider's entry and the top level is empty, so `/model`
+   * asked an empty URL what it served and showed nothing.
+   */
+  endpoint?: { baseUrl?: string | undefined; apiKey?: string | undefined } | undefined;
 }): Promise<Driver> {
-  const { daemon, settings, workspace, local, label } = options;
+  const { daemon, settings, workspace, local, label, endpoint } = options;
 
   let state: SessionState = {
     lines: [],
@@ -189,7 +197,12 @@ export async function createDriver(options: {
       // What the endpoint currently serves. Without this `/model` could only
       // print the name already configured, which is not a list of anything.
       listModels: async () => {
-        const res = await fetch(modelsUrl(settings.baseUrl ?? ""));
+        const baseUrl = endpoint?.baseUrl ?? settings.baseUrl;
+        if (!baseUrl) throw new Error("this provider has no endpoint to ask");
+
+        const res = await fetch(modelsUrl(baseUrl), {
+          headers: endpoint?.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {},
+        });
         if (!res.ok) throw new Error(`endpoint returned ${res.status}`);
         const body = (await res.json()) as { data?: Array<{ id?: string }> };
         return (body.data ?? []).map((m) => m.id).filter((id): id is string => Boolean(id));

@@ -19,8 +19,9 @@ export async function runTui(
   workspace: string,
   local: boolean,
   label: string,
+  endpoint?: { baseUrl?: string | undefined; apiKey?: string | undefined } | undefined,
 ): Promise<number> {
-  const driver = await createDriver({ daemon, settings, workspace, local, label });
+  const driver = await createDriver({ daemon, settings, workspace, local, label, endpoint });
 
   const app = render(
     createElement(App, {

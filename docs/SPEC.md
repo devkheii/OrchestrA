@@ -984,6 +984,15 @@ It is cached by configuration — model file, quantization, and server flags —
 and re-run when any of those change, so the cost is paid once per setup rather
 than once per session.
 
+**Every configured endpoint is checked, not only the ones served here.** An
+earlier revision scoped this to models this machine serves, reasoning that
+probing someone's paid endpoint spends their quota to catch failure modes — a
+quantized cache, weights with no chat template — that only exist when we serve
+the weights. The reasoning was about the failure modes, and it skipped the one
+thing every endpoint can fail at: being reachable. A configured remote provider
+went straight into a session that could not answer a single message. Six small
+requests, once per configuration, is not a quota anyone notices.
+
 **Whether tools work is measured, not assumed.** Invariant 41 ends "a provider
 that cannot call tools is told so and is offered none", and an adapter cannot
 answer that from its own class. With an OpenAI-compatible endpoint it depends

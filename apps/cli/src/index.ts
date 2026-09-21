@@ -184,14 +184,14 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
         settings = await settingsFor(rawArgv);
       }
 
-      return withDaemon(settings, io, (daemon) => {
+      return withDaemon(settings, io, (daemon, endpoint) => {
         const selection = providerFromSettings(settings);
         // The full-screen session. `runInteractive` remains the line-based
         // one, used where a renderer cannot run — a dumb terminal, a CI log —
         // and both drive the same turn, approval and command code.
         return process.env["DEM_PLAIN"]
           ? runInteractive(daemon, settings, process.cwd(), selection.local, selection.label, io)
-          : runTui(daemon, settings, process.cwd(), selection.local, selection.label);
+          : runTui(daemon, settings, process.cwd(), selection.local, selection.label, endpoint);
       });
 
     case "help":
@@ -378,7 +378,10 @@ async function selectChanges(
 async function withDaemon(
   settings: Settings,
   io: Io,
-  fn: (d: DaemonHandle) => Promise<number>,
+  fn: (
+    d: DaemonHandle,
+    endpoint: { baseUrl?: string | undefined; apiKey?: string | undefined },
+  ) => Promise<number>,
 ): Promise<number> {
   const stateDir = defaultStateDir();
 
@@ -448,16 +451,20 @@ async function withDaemon(
   // prove, and a remote endpoint would be probed with the user's own quota to
   // catch failure modes — a quantized cache, a GGUF with no chat template —
   // that only exist when we are the ones serving the weights.
-  const servesLocally =
-    usesConfiguredEndpoint &&
-    providerFromSettings(settings).local &&
-    Boolean(settings.modelPath ?? settings.baseUrl);
+  // Any endpoint this run will actually talk to, local or not.
+  //
+  // This was scoped to models served here, to avoid spending someone's paid
+  // quota on failure modes that only exist when we serve the weights. That
+  // reasoning was about the failure modes, and it skipped the one thing every
+  // endpoint can fail at: being reachable. A configured remote provider went
+  // straight into a session that could not answer a single message.
+  const checkable = usesConfiguredEndpoint && Boolean(chosen.baseUrl ?? settings.modelPath);
 
   let toolCalling: boolean | undefined;
-  if (servesLocally && !settings.skipSmokeTest) {
+  if (checkable && !settings.skipSmokeTest) {
     const smokeConfig = {
-      model: settings.model,
-      baseUrl: settings.baseUrl,
+      model: chosen.model ?? settings.model,
+      baseUrl: chosen.baseUrl ?? settings.baseUrl,
       modelPath: settings.modelPath,
       args: settings.llamaArgs,
     };
@@ -492,7 +499,9 @@ async function withDaemon(
 
   const daemon = await startDaemon({ workspace: process.cwd(), stateDir, provider });
   try {
-    return await fn(daemon);
+    // The endpoint this run resolved to, handed on so a session command does
+    // not have to re-derive it - and get it wrong for a named provider.
+    return await fn(daemon, { baseUrl: chosen.baseUrl, apiKey: chosen.apiKey });
   } catch (err) {
     io.err(`dem: ${(err as Error).message}\n`);
     return 1;

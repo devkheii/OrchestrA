@@ -5,6 +5,7 @@ import type { ModelEvent, ModelRequest, Provider, ProviderHealth } from "@dem/pr
 import {
   SMOKE_TASKS,
   configFingerprint,
+  explainSmokeFailure,
   probeToolCalling,
   readSmokeResult,
   runSmokeTest,
@@ -401,5 +402,39 @@ describe("Whether this configuration can call tools", () => {
       expect(result.toolCalling).toBe(false);
       expect((await readSmokeResult(config, dir))?.toolCalling).toBe(false);
     });
+  });
+});
+
+describe("A remote provider is checked too", () => {
+  /**
+   * Reported from a real session: a configured remote endpoint was selected,
+   * the session opened, the header said REMOTE, and the first message came
+   * back "could not reach ... fetch failed".
+   *
+   * The check had been scoped to models this machine serves, on the reasoning
+   * that probing someone's paid endpoint spends their quota to catch failure
+   * modes — a quantized cache, weights with no chat template — that only exist
+   * when we serve the weights ourselves.
+   *
+   * That reasoning was about the *failure modes*, and it skipped the one thing
+   * every endpoint can fail at: being reachable. Six small requests, once per
+   * configuration, is not a quota anyone notices, and the alternative is a
+   * session that opens and cannot answer.
+   */
+  it("reports an unreachable endpoint as unreachable, not as a wrong model", async () => {
+    const dead: Provider = {
+      id: "dead",
+      capabilities: () => [CAP_TEXT_GENERATE],
+      async *run(): AsyncIterable<ModelEvent> {
+        yield { type: "error", message: "could not reach http://10.0.0.1/v1: fetch failed" };
+      },
+      health: async () => ({ ok: false, detail: "unreachable" }),
+    };
+
+    const result = await runSmokeTest(dead);
+    expect(result.unreachable).toBe(true);
+    expect(explainSmokeFailure(result, { baseUrl: "http://10.0.0.1/v1" })).toMatch(
+      /could not get an answer|not running|still starting/i,
+    );
   });
 });
