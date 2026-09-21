@@ -25,6 +25,8 @@ export interface ModelServerConfig {
   /** Extra flags, for a user who knows their hardware better than we do. */
   extraArgs?: readonly string[] | undefined;
   startupTimeoutMs?: number | undefined;
+  /** Told when the wait moves from "opening a port" to "loading weights". */
+  onProgress?: ((note: string) => void) | undefined;
 }
 
 export interface ModelServer {
@@ -95,7 +97,7 @@ export async function ensureModelServer(
 
   try {
     await Promise.race([
-      waitForListening(baseUrl, config.startupTimeoutMs ?? 180_000),
+      waitForReady(baseUrl, config.startupTimeoutMs ?? 180_000, config.onProgress),
       failed,
     ]);
   } catch (err) {
@@ -121,16 +123,81 @@ export function isListening(baseUrl: string): Promise<boolean> {
   });
 }
 
-async function waitForListening(baseUrl: string, timeoutMs: number): Promise<void> {
+/**
+ * Wait until the server will actually answer, not until its port is open.
+ *
+ * Those are different moments and the gap is the whole load time of the
+ * weights. llama.cpp and Ollama bind the port immediately, answer `/v1/models`
+ * throughout, and return 503 "Loading model" to completions until the model is
+ * in memory — so a caller told "ready" when the socket accepted got a server
+ * that refused everything for the next minute. In this harness that reached
+ * the user as "your model answered 0 of 5 trivial questions", which blames the
+ * model for the launcher's impatience.
+ */
+async function waitForReady(
+  baseUrl: string,
+  timeoutMs: number,
+  onProgress?: ((note: string) => void) | undefined,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
-  for (;;) {
-    if (await isListening(baseUrl)) return;
+  // First the port, since there is nothing to ask until something accepts.
+  while (!(await isListening(baseUrl))) {
     if (Date.now() >= deadline) {
       throw new Error(`model server did not start listening at ${baseUrl} within ${timeoutMs}ms`);
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
+
+  onProgress?.("loading the model");
+
+  // Then the endpoint the caller is actually going to use.
+  for (;;) {
+    const status = await probeCompletions(baseUrl);
+    if (status !== "loading") return;
+
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `model server at ${baseUrl} was still loading after ${Math.round(timeoutMs / 1000)}s. ` +
+          `Large weights on a slow disk can take longer; raise the timeout, or start the ` +
+          `server yourself and let dem attach to it.`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+/**
+ * One cheap request, read only for whether the server is still loading.
+ *
+ * Anything that is not a 503 means the server is answering: a 200, a 400 about
+ * the request shape, a 404 from a gateway. Waiting for correctness here would
+ * duplicate the smoke test (§25.3), which runs next and is where a wrong
+ * answer belongs.
+ */
+async function probeCompletions(baseUrl: string): Promise<"loading" | "answering"> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    const res = await fetch(`${trimEnd(baseUrl)}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "ready?" }], max_tokens: 1 }),
+      signal: controller.signal,
+    });
+    return res.status === 503 ? "loading" : "answering";
+  } catch {
+    // Refused or timed out mid-load: it was listening a moment ago, so this is
+    // a server still getting itself together rather than one that is gone.
+    return "loading";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function trimEnd(url: string): string {
+  return url.replace(/\/+$/, "");
 }
 
 function portOf(baseUrl: string): number {

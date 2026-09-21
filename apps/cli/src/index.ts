@@ -418,14 +418,16 @@ async function withDaemon(
   const usesConfiguredEndpoint = !chosen.kind;
   if (usesConfiguredEndpoint && settings.modelPath && settings.baseUrl) {
     try {
+      io.err(`\u001b[2mstarting a model server at ${settings.baseUrl}\u001b[0m\n`);
       modelServer = await ensureModelServer(settings.baseUrl, {
         modelPath: settings.modelPath,
         command: settings.llamaCommand,
         contextSize: settings.contextSize,
+        // Loading several gigabytes takes a while, and a terminal that shows
+        // nothing for a minute looks hung.
+        onProgress: (note) => io.err(`\u001b[2m${note}...\u001b[0m\n`),
       });
-      if (modelServer.started) {
-        io.err(`[2mstarted a model server at ${settings.baseUrl}[0m\n`);
-      }
+      if (modelServer.started) io.err(`[2mready[0m\n`);
     } catch (err) {
       io.err(`dem: ${(err as Error).message}\n`);
       return 1;

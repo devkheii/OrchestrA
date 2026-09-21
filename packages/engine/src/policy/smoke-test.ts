@@ -101,6 +101,14 @@ export interface SmokeFailure {
   expected: readonly string[];
   /** What actually came back, so a corrupted cache is identifiable on sight. */
   got: string;
+  /**
+   * Whether the model answered at all.
+   *
+   * A wrong answer is a verdict about the configuration. No answer is a
+   * verdict about nothing, and the two have different fixes: one replaces
+   * weights, the other waits for a server.
+   */
+  answered: boolean;
 }
 
 export interface SmokeResult {
@@ -108,6 +116,15 @@ export interface SmokeResult {
   passed: number;
   total: number;
   failures: readonly SmokeFailure[];
+  /**
+   * Nothing answered, so nothing was measured.
+   *
+   * The rule that caught four instrument failures in the efficacy experiment:
+   * a failed request is not a wrong answer. Here it reached the user as "your
+   * model answered 0 of 5 trivial questions" while a local server was still
+   * loading its weights.
+   */
+  unreachable: boolean;
   /** Set when the result was read from cache rather than measured now. */
   cached?: boolean;
 }
@@ -188,21 +205,29 @@ export async function runSmokeTest(
       // Trimmed, because this is shown to a person and a broken model can
       // produce a great deal of nothing.
       got: answer.text.slice(0, 200).trim() || `<${answer.reason}>`,
+      answered: answer.text.trim().length > 0,
     });
   }
+
+  // Nothing came back at all: the server was down, still loading, or behind
+  // something that refused. That is not a measurement of this model.
+  const unreachable = passed === 0 && failures.every((f) => !f.answered);
 
   const result: SmokeResult = {
     ok: failures.length <= TOLERATED_FAILURES,
     passed,
     total: SMOKE_TASKS.length,
     failures,
+    unreachable,
   };
 
-  if (options.config && options.cacheDir) {
-    // A failure is cached too. Re-running a broken configuration every session
-    // spends the user's time to re-learn something already known, and the fix
-    // is a config change, which changes the fingerprint and re-runs this
-    // anyway.
+  if (options.config && options.cacheDir && !unreachable) {
+    // A wrong answer is cached, because re-running a broken configuration
+    // every session spends the user's time to re-learn something already
+    // known, and the fix is a config change, which changes the fingerprint.
+    //
+    // A non-answer is not, because caching it turns a server that was briefly
+    // unavailable into a permanent verdict about weights that were fine.
     await write(options.config, options.cacheDir, result);
   }
 
@@ -211,6 +236,17 @@ export async function runSmokeTest(
 
 /** A sentence a person can act on, rather than "the smoke test failed". */
 export function explainSmokeFailure(result: SmokeResult, config: SmokeConfig): string {
+  if (result.unreachable) {
+    // A different problem with a different fix. Telling someone their model is
+    // broken when the server was not up sends them to replace weights that
+    // were fine.
+    return [
+      `could not get an answer out of this model at all, so it has not been checked.`,
+      ...result.failures.slice(0, 2).map((f) => `  ${f.id}: ${f.got}`),
+      `  The server may still be starting, or may not be running.`,
+    ].join("\n");
+  }
+
   const lines = [
     `this model configuration answered ${result.passed} of ${result.total} trivial questions correctly, ` +
       `so it is not working (SPEC §25.3).`,

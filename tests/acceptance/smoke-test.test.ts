@@ -253,3 +253,74 @@ describe("Scope: what gets checked and what does not", () => {
     expect((await runSmokeTest(thinksOnly)).ok).toBe(false);
   });
 });
+
+describe("A failed request is not a wrong answer", () => {
+  /**
+   * The rule that caught four instrument failures in the efficacy experiment,
+   * arriving in the product the third time it was needed here.
+   *
+   * `dem` started a local server, the smoke test fired while the weights were
+   * still loading, every question came back 503, and the verdict "your model
+   * answered 0 of 5" was written to the cache. The launcher's impatience was
+   * then reported as the model's fault on every subsequent run, including
+   * after it was fixed.
+   */
+  const unreachable: Provider = {
+    id: "unreachable",
+    capabilities: () => [CAP_TEXT_GENERATE],
+    async *run(): AsyncIterable<ModelEvent> {
+      yield { type: "error", message: "endpoint returned 503" };
+    },
+    health: async () => ({ ok: false, detail: "loading" }),
+  };
+
+  it("does not record a verdict when nothing ever answered", async () => {
+    await withTempDir(async (dir) => {
+      const config = { model: "m", baseUrl: "http://127.0.0.1:1" };
+      const result = await runSmokeTest(unreachable, { config, cacheDir: dir });
+
+      expect(result.ok).toBe(false);
+      // Not measured, so nothing to remember. The next run tries again rather
+      // than repeating a conclusion it never actually reached.
+      expect(await readSmokeResult(config, dir)).toBeUndefined();
+    });
+  });
+
+  it("still records a verdict when the model answered and was wrong", async () => {
+    await withTempDir(async (dir) => {
+      const config = { model: "m", baseUrl: "http://127.0.0.1:1" };
+      await runSmokeTest(broken, { config, cacheDir: dir });
+      expect((await readSmokeResult(config, dir))?.ok).toBe(false);
+    });
+  });
+
+  it("says it could not reach the model, rather than that the model is wrong", async () => {
+    // Two different problems with two different fixes. Telling someone their
+    // model is broken when the server was not up sends them to replace weights
+    // that were fine.
+    const result = await runSmokeTest(unreachable);
+    expect(result.unreachable).toBe(true);
+  });
+
+  it("treats a wrong answer as measured even if one task also errored", async () => {
+    // A single transport hiccup among real answers is not grounds to discard
+    // what the other four said.
+    let n = 0;
+    const mostly: Provider = {
+      id: "mostly",
+      capabilities: () => [CAP_TEXT_GENERATE],
+      async *run(): AsyncIterable<ModelEvent> {
+        if (n++ === 0) {
+          yield { type: "error", message: "transient" };
+          return;
+        }
+        yield { type: "delta", text: "nonsense" };
+        yield { type: "done", reason: "stop" };
+      },
+      health: async () => ({ ok: true, detail: "" }),
+    };
+    const result = await runSmokeTest(mostly);
+    expect(result.unreachable).toBe(false);
+    expect(result.ok).toBe(false);
+  });
+});

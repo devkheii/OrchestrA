@@ -984,6 +984,22 @@ It is cached by configuration — model file, quantization, and server flags —
 and re-run when any of those change, so the cost is paid once per setup rather
 than once per session.
 
+**A failed request is not a wrong answer.** If nothing answered — the server
+is down, still loading its weights, or behind something refusing — then
+nothing was measured, and the result says so rather than blaming the model.
+Such a result is **not cached**: caching it turns a server that was briefly
+unavailable into a permanent verdict about weights that were fine. This is the
+same rule that caught four instrument failures in the efficacy runs, and it
+reached this harness the third time it was needed — here as "your model
+answered 0 of 5 trivial questions", printed while a local server was still
+loading.
+
+For the same reason, starting a model server waits until it will *answer*, not
+until its port is open. llama.cpp and Ollama bind immediately, serve
+`/v1/models` throughout, and return 503 to completions until the model is in
+memory; a launcher that treats an open socket as readiness hands its caller a
+server that refuses everything for the next minute.
+
 **What it deliberately does not catch.** A smoke test detects catastrophic
 breakage, not degradation. A configuration that has quietly cost seven points
 of accuracy passes it, and nothing in this harness will notice, because

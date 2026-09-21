@@ -132,3 +132,68 @@ describe("Failures explain themselves", () => {
     );
   });
 });
+
+describe("Ready means ready to answer, not ready to refuse", () => {
+  /**
+   * Found by running it. `dem` started a server, the port opened, the smoke
+   * test fired immediately and got five 503s, and the user was told their
+   * model was broken while it was still loading.
+   *
+   * The same mistake was found and fixed in the experiment runner days
+   * earlier, where `/v1/models` answers 200 throughout the load. It was not
+   * looked for here, which is twice now that a fix landed in the experiment
+   * and not in the product.
+   */
+  it("waits for the model to load, not just for the port to open", async () => {
+    await withTempDir(async (dir) => {
+      const modelPath = join(dir, "SCENARIO_SLOW_LOAD.gguf");
+      await writeFile(modelPath, "x");
+      const port = await freePort();
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      const server = await ensureModelServer(baseUrl, {
+        command: process.execPath,
+        commandArgs: [FAKE_SERVER],
+        modelPath,
+        startupTimeoutMs: 30_000,
+      });
+
+      try {
+        // The contract: when this resolves, a request works. Not "a socket
+        // accepts", which is what the port opening means.
+        const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ messages: [{ role: "user", content: "x" }], max_tokens: 1 }),
+        });
+        expect(res.status).not.toBe(503);
+        expect(res.ok).toBe(true);
+      } finally {
+        await server.stop();
+      }
+    });
+  }, 60_000);
+
+  it("gives up rather than waiting forever on a server stuck loading", async () => {
+    await withTempDir(async (dir) => {
+      const modelPath = join(dir, "SCENARIO_SLOW_LOAD.gguf");
+      await writeFile(modelPath, "x");
+      const port = await freePort();
+
+      // Longer than the deadline, so the wait has to end on its own.
+      process.env["FAKE_LOAD_MS"] = "60000";
+      try {
+        await expect(
+          ensureModelServer(`http://127.0.0.1:${port}`, {
+            command: process.execPath,
+            commandArgs: [FAKE_SERVER],
+            modelPath,
+            startupTimeoutMs: 3_000,
+          }),
+        ).rejects.toThrow(/did not|timed out|loading/i);
+      } finally {
+        delete process.env["FAKE_LOAD_MS"];
+      }
+    });
+  }, 30_000);
+});
