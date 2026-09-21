@@ -21,6 +21,7 @@ export * from "./delegation/delegate.js";
 export * from "./policy/load-config.js";
 export * from "./policy/smoke-test.js";
 export * from "./secrets/store.js";
+export * from "./policy/runtime.js";
 export * from "./policy/providers.js";
 export * from "./policy/discovery.js";
 export * from "./runtime/model-server.js";

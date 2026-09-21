@@ -1,8 +1,8 @@
 import { createElement, useEffect, useState } from "react";
 import { Box, Text, render } from "ink";
 import SelectInput from "ink-select-input";
-import TextInput from "ink-text-input";
 import { discoverServers, discoverWeights, humanSize } from "@dem/engine";
+import { Configure, type ConfiguredProvider } from "./configure.js";
 
 /**
  * What `dem` shows before it connects to anything.
@@ -21,13 +21,14 @@ import { discoverServers, discoverWeights, humanSize } from "@dem/engine";
  * answer. Anything that needs typing is a field in this component.
  */
 
-export interface ManualProvider {
-  name: string;
-  baseUrl: string;
-  model?: string | undefined;
-  /** Plain value, to be put in the credential store by the caller. */
-  apiKey?: string | undefined;
-}
+/**
+ * A provider the user configured here.
+ *
+ * Replaces a four-question form that only knew how to describe an
+ * OpenAI-compatible endpoint. What is asked now depends on the runtime
+ * (SPEC 33.5), which is the thing that decides what the answers mean.
+ */
+export type ManualProvider = ConfiguredProvider;
 
 export interface StartChoice {
   /** A configured provider name, or undefined for the flat configuration. */
@@ -81,8 +82,6 @@ export async function pickAtStart(options: StartOptions): Promise<StartChoice> {
   });
 }
 
-type Step = "pick" | "name" | "url" | "model" | "key";
-
 function Start({
   workspace,
   configured,
@@ -90,9 +89,8 @@ function Start({
   onChoose,
 }: StartOptions & { onChoose: (choice: StartChoice) => void }) {
   const [found, setFound] = useState<Entry[] | undefined>(undefined);
-  const [step, setStep] = useState<Step>("pick");
-  const [draft, setDraft] = useState("");
-  const [entry, setEntry] = useState<ManualProvider>({ name: "", baseUrl: "" });
+  const [weights, setWeights] = useState<Array<{ label: string; path: string }>>([]);
+  const [adding, setAdding] = useState(false);
 
   // Discovery runs while the configured entries are already on screen, so the
   // list is useful immediately and grows, rather than making someone wait for
@@ -102,6 +100,13 @@ function Start({
     void (async () => {
       const [servers, weights] = await Promise.all([discoverServers(), discoverWeights()]);
       if (!live) return;
+
+      setWeights(
+        weights.slice(0, 8).map((w) => ({
+          label: `${w.path.split(/[\/]/).pop() ?? w.path}  ${humanSize(w.sizeBytes)}`,
+          path: w.path,
+        })),
+      );
 
       setFound([
         ...servers.flatMap((server) =>
@@ -158,38 +163,17 @@ function Start({
     },
   ];
 
-  if (step !== "pick") {
+  if (adding) {
     return (
       <Box flexDirection="column">
         <Box marginBottom={1}>
           <Text bold>dem</Text>
           <Text dimColor>  adding a provider</Text>
         </Box>
-        <Field
-          step={step}
-          draft={draft}
-          setDraft={setDraft}
-          onSubmit={(value) => {
-            const trimmed = value.trim();
-            setDraft("");
-
-            if (step === "name") {
-              if (!trimmed) return onChoose({ cancelled: true });
-              setEntry((e) => ({ ...e, name: trimmed }));
-              setStep("url");
-            } else if (step === "url") {
-              if (!trimmed) return onChoose({ cancelled: true });
-              setEntry((e) => ({ ...e, baseUrl: trimmed }));
-              setStep("model");
-            } else if (step === "model") {
-              setEntry((e) => ({ ...e, ...(trimmed ? { model: trimmed } : {}) }));
-              setStep("key");
-            } else {
-              // The key is optional: a local endpoint usually needs none, and
-              // an empty answer must not look like a failure.
-              onChoose({ manual: { ...entry, ...(trimmed ? { apiKey: trimmed } : {}) } });
-            }
-          }}
+        <Configure
+          weights={weights}
+          onCancel={() => onChoose({ cancelled: true })}
+          onDone={(provider) => onChoose({ manual: provider })}
         />
       </Box>
     );
@@ -206,7 +190,7 @@ function Start({
         items={entries.map((e) => ({ key: e.key, label: e.label, value: e.value }))}
         onSelect={(item) => {
           if (item.value === MANUAL) {
-            setStep("name");
+            setAdding(true);
             return;
           }
           const chosen = entries.find((e) => e.value === item.value);
@@ -214,39 +198,6 @@ function Start({
         }}
       />
       {found === undefined ? <Text dimColor>  looking for more...</Text> : null}
-    </Box>
-  );
-}
-
-const QUESTION: Record<Exclude<Step, "pick">, string> = {
-  name: "a name for it (e.g. openai, work): ",
-  url: "endpoint URL: ",
-  model: "model name (blank to decide later): ",
-  key: "API key (blank if none): ",
-};
-
-function Field({
-  step,
-  draft,
-  setDraft,
-  onSubmit,
-}: {
-  step: Step;
-  draft: string;
-  setDraft: (v: string) => void;
-  onSubmit: (v: string) => void;
-}) {
-  if (step === "pick") return null;
-  return (
-    <Box>
-      <Text>{QUESTION[step]}</Text>
-      <TextInput
-        value={draft}
-        onChange={setDraft}
-        onSubmit={onSubmit}
-        // A key typed in front of someone is a key to rotate.
-        {...(step === "key" ? { mask: "•" } : {})}
-      />
     </Box>
   );
 }

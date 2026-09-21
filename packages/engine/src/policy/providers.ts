@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { createSecretBroker, isSecretRef } from "../secrets/broker.js";
 import type { Settings } from "./load-config.js";
+import { runtimeById, type RuntimeId, type StartOptions } from "./runtime.js";
 
 /**
  * Named providers (SPEC §33.2).
@@ -20,6 +21,16 @@ import type { Settings } from "./load-config.js";
  */
 
 export interface ProviderConfig {
+  /**
+   * Who serves this model (SPEC 33.5).
+   *
+   * Absent in configurations written before runtimes existed, which still
+   * work: an endpoint with no runtime is an OpenAI-compatible one, which is
+   * what they all were.
+   */
+  runtime?: RuntimeId | undefined;
+  /** Start options, for a runtime the harness serves itself. */
+  options?: StartOptions | undefined;
   /** A built-in kind: `anthropic`, `claude-cli`. Absent means OpenAI-compatible. */
   kind?: string | undefined;
   baseUrl?: string | undefined;
@@ -47,6 +58,8 @@ export interface ChosenProvider {
   apiKey?: string | undefined;
   /** Set only when this endpoint's weights are ours to serve. */
   modelPath?: string | undefined;
+  runtime?: RuntimeId | undefined;
+  options?: StartOptions | undefined;
 }
 
 /**
@@ -93,13 +106,13 @@ export async function effectiveProvider(
             `Add one under "providers" in .dem/config.json.`,
       );
     }
-    return withKey({ name: asked, ...entry }, home);
+    return withKey(withRuntime({ name: asked, ...entry }), home);
   }
 
   if (names.length === 1) {
     // Making someone name the single thing they configured is ceremony.
     const only = names[0]!;
-    return withKey({ name: only, ...configured[only]! }, home);
+    return withKey(withRuntime({ name: only, ...configured[only]! }), home);
   }
 
   if (names.length > 1) {
@@ -114,6 +127,26 @@ export async function effectiveProvider(
   // Nothing named: the flat settings, which is what a single-endpoint setup
   // and every existing config still look like.
   return withKey({ name: "default", ...topLevel(settings) }, home);
+}
+
+
+/**
+ * Fill in what the runtime implies.
+ *
+ * A runtime that knows its own endpoint should not make someone type it, and
+ * one the harness serves should start with the options that were measured
+ * rather than with the server's defaults.
+ */
+function withRuntime(chosen: ChosenProvider & ProviderConfig): ChosenProvider & ProviderConfig {
+  const runtime = runtimeById(chosen.runtime);
+  if (!runtime) return chosen;
+
+  return {
+    ...chosen,
+    ...(chosen.baseUrl || !runtime.defaultBaseUrl ? {} : { baseUrl: runtime.defaultBaseUrl }),
+    // A built-in kind and a runtime are the same statement from two eras.
+    ...(runtime.id === "anthropic" || runtime.id === "claude-cli" ? { kind: runtime.id } : {}),
+  };
 }
 
 function topLevel(settings: Settings): ProviderConfig {

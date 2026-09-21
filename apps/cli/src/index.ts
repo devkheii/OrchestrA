@@ -9,6 +9,8 @@ import {
   delegate,
   effectiveProvider,
   ensureModelServer,
+  runtimeById,
+  startArgs,
   explainSmokeFailure,
   resolveSettings,
   runSmokeTest,
@@ -23,7 +25,6 @@ import { runInteractive } from "./interactive.js";
 import { runTui } from "./tui/index.js";
 import { readLine, runOnce, showLog } from "./commands.js";
 import { runAuth } from "./auth.js";
-import { runSetup, SETUP_DONE } from "./setup.js";
 
 import { pickAtStart } from "./tui/start.js";
 import { applyStartChoice } from "./tui/apply-choice.js";
@@ -216,9 +217,15 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
       return 0;
 
     case "setup": {
-      // Run on its own, setup configures and stops.
-      const code = await runSetup(io, process.cwd());
-      return code === SETUP_DONE ? 0 : code;
+      // The same menu `dem` opens. It was a second screen over the same data
+      // with its own way of choosing, which is the drift this project spends
+      // its effort on -- built here by the person preventing it.
+      if (!process.stdin.isTTY) {
+        io.err("dem setup needs a terminal it can ask questions in.\n");
+        return 2;
+      }
+      const chosen = await startMenu(process.cwd(), settings, io);
+      return chosen === undefined ? 1 : 0;
     }
 
     case "auth":
@@ -438,8 +445,13 @@ async function startMenu(
     const entered = choice.manual;
     const providers = (config["providers"] ?? {}) as Record<string, unknown>;
 
-    const provider: Record<string, unknown> = { baseUrl: entered.baseUrl };
+    const provider: Record<string, unknown> = { runtime: entered.runtime };
+    if (entered.baseUrl) provider["baseUrl"] = entered.baseUrl;
     if (entered.model) provider["model"] = entered.model;
+    // Weights and start options belong to the entry that serves them
+    // (SPEC 33.2, 33.5), never to the file as a whole.
+    if (entered.modelPath) provider["modelPath"] = entered.modelPath;
+    if (entered.options) provider["options"] = entered.options;
 
     if (entered.apiKey) {
       // Into the credential store, never into the config file (invariant 6).
@@ -451,9 +463,17 @@ async function startMenu(
     config["providers"] = providers;
     config["provider"] = entered.name;
 
-    if (!/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])/.test(entered.baseUrl)) {
+    // The runtime says whether context leaves this machine, rather than a
+    // test on the URL: the Claude CLI is a local binary that forwards
+    // everything (invariant 1).
+    const runtime = runtimeById(entered.runtime);
+    const leaves =
+      runtime?.local === false ||
+      (entered.baseUrl !== undefined &&
+        !/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])/.test(entered.baseUrl));
+    if (leaves) {
       io.err(
-        "[2mthis endpoint is not on this machine; prompts and files read will be sent to it[0m\n",
+        "[2mthis provider sends prompts and the files dem reads off this machine[0m\n",
       );
       config["allowRemote"] = true;
     }
@@ -479,6 +499,18 @@ async function hasRipgrep(): Promise<boolean> {
   const { execCommand } = await import("@dem/engine");
   const result = await execCommand("rg", ["--version"], { cwd: process.cwd(), timeoutMs: 5_000 });
   return !result.failedToStart;
+}
+
+
+/**
+ * Server arguments for a provider's options, minus the context size.
+ *
+ * `ensureModelServer` takes the context separately, so passing it twice would
+ * put `-c` on the command line twice.
+ */
+function startArgsFor(options: NonNullable<Parameters<typeof startArgs>[0]>): string[] {
+  const { contextSize: _handled, ...rest } = options;
+  return startArgs(rest);
 }
 
 async function withDaemon(
@@ -543,7 +575,13 @@ async function withDaemon(
       modelServer = await ensureModelServer(chosen.baseUrl, {
         modelPath: chosen.modelPath,
         command: settings.llamaCommand,
-        contextSize: settings.contextSize,
+        // From the provider's own entry (SPEC 33.5). These used to live at the
+        // top level of settings, where they applied to whichever provider was
+        // selected -- and -ngl, KV quantization and flash attention had no way
+        // in at all, though they are what took a run from 33 minutes to 3 and
+        // what took a model from 46/60 to 0/60.
+        ...(chosen.options?.contextSize ? { contextSize: chosen.options.contextSize } : {}),
+        ...(chosen.options ? { extraArgs: startArgsFor(chosen.options) } : {}),
         // Loading several gigabytes takes a while, and a terminal that shows
         // nothing for a minute looks hung.
         onProgress: (note) => io.err(`\u001b[2m${note}...\u001b[0m\n`),

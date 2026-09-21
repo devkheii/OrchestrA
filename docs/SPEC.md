@@ -1772,6 +1772,73 @@ selected, and at the top level otherwise — writing it to the top level while a
 named provider is active would set a value that entry overrides, so the change
 would appear to do nothing.
 
+### 33.5 Runtimes
+
+Three things were one thing. A provider entry held `baseUrl`, `model`,
+`apiKey` and `modelPath`, which conflates:
+
+| | | decides |
+|---|---|---|
+| the **runtime** | who serves it | whether dem starts it, what options exist, what the gate says |
+| the **model** | which weights, or which name at that runtime | |
+| the **connection** | where it is, and what authenticates | |
+
+Without the first, every local server was "an OpenAI-compatible baseUrl". There
+was no way to say llama.cpp rather than Ollama, and nowhere to put the options
+that only one of them has.
+
+```text
+llama.cpp    dem serves a .gguf itself — context, offload, cache, flash attention
+ollama       attach to a running Ollama
+lm-studio    attach to a running LM Studio
+openai       any OpenAI-compatible endpoint, here or elsewhere
+anthropic    the API; bills per request; tool calling
+claude-cli   the Claude Code CLI; a subscription's rate limit; no tool calling
+```
+
+The runtime decides **what is asked for**. Asking Ollama for a `.gguf` path, or
+the Anthropic API for a port, is how a configuration screen teaches people to
+stop reading it.
+
+It also decides **what the gate says**, which is why locality is a property of
+the runtime rather than a test on the URL: `claude-cli` is a local binary that
+forwards every prompt to a third party (invariant 1).
+
+And it decides **whether tools are offered**: `claude-cli` is known not to call
+them, so that is declared rather than discovered by a session that answers
+every message with a refusal (invariant 41).
+
+### 33.6 Start options belong to the provider that uses them
+
+For a runtime the harness serves, the options are not decoration. Measured on
+this project:
+
+| option | measured |
+|---|---|
+| `-ctk q4_0` | 46/60 → **0/60**. Not a quality trade — destruction |
+| `-ctk q8_0` + `-fa on` | identical score, **eleven times faster** |
+| `-ngl 999` at 8k context | loaded, served one request, **died mid-run** |
+
+None of them could be set from configuration. `contextSize` and `llamaCommand`
+existed at the *top level* of settings — the same defect `modelPath` had, where
+a value applies to whichever provider happens to be selected next.
+
+They now live on the entry whose endpoint uses them, and the defaults are what
+was measured rather than the server's: 8192 context, auto offload, `q8_0`
+cache, flash attention on. The menu shows `q4_0` with its measurement attached,
+because it is the option someone short of memory reaches for first.
+
+### 33.7 One configuration screen
+
+`dem setup`, the start menu and `/provider add` each had their own screen over
+the same data — 851 lines between them, three ways to choose, and three places
+for a change to be forgotten. That is the drift this document spends most of
+its effort preventing, and it was built by the people preventing it.
+
+There is one component. `dem setup` opens the menu `dem` opens. `/provider add`
+opens the same form. A runtime added in one place appears in all of them
+because there is no other place for it to appear.
+
 ### 33.3 The first minute
 
 A harness that cannot be configured has no users, and configuration was the
