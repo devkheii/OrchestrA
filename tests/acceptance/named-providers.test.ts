@@ -192,3 +192,69 @@ describe("A missing credential is reported, not worked around", () => {
     });
   });
 });
+
+describe("Which endpoint the weights belong to", () => {
+  /**
+   * From a real session: the selected provider was a remote endpoint, and
+   * `dem` loaded a 5.8GB local model first, waited for it, and then checked
+   * the remote one.
+   *
+   * `modelPath` sat at the top level next to a `baseUrl` of 127.0.0.1:8099
+   * from an earlier `dem setup`, and a named provider had been added since.
+   * Serving weights is paired with an endpoint; it is not a global setting
+   * that applies to whichever provider happens to be selected.
+   */
+  it("carries modelPath on the provider it belongs to", async () => {
+    await withTempDir(async (home) => {
+      await withTempDir(async (workspace) => {
+        await writeConfig(workspace, {
+          providers: {
+            local: {
+              baseUrl: "http://127.0.0.1:8099",
+              model: "qwen",
+              modelPath: "E:/models/qwen.gguf",
+            },
+          },
+        });
+        const settings = await load(workspace, home);
+        const chosen = await effectiveProvider(settings, "local", home);
+        expect(chosen.modelPath).toBe("E:/models/qwen.gguf");
+      });
+    });
+  });
+
+  it("does not hand a named remote provider the top-level modelPath", async () => {
+    // The bug exactly: weights configured for a local endpoint must not be
+    // loaded because a different, remote provider was selected.
+    await withTempDir(async (home) => {
+      await withTempDir(async (workspace) => {
+        await writeConfig(workspace, {
+          modelPath: "E:/models/qwen.gguf",
+          baseUrl: "http://127.0.0.1:8099",
+          provider: "remote",
+          providers: { remote: { baseUrl: "http://10.0.0.1:8000/v1", model: "m" } },
+        });
+        const settings = await load(workspace, home);
+        const chosen = await effectiveProvider(settings, undefined, home);
+
+        expect(chosen.baseUrl).toBe("http://10.0.0.1:8000/v1");
+        expect(chosen.modelPath).toBeUndefined();
+      });
+    });
+  });
+
+  it("still serves the flat configuration a setup run writes", async () => {
+    await withTempDir(async (home) => {
+      await withTempDir(async (workspace) => {
+        await writeConfig(workspace, {
+          modelPath: "E:/models/qwen.gguf",
+          baseUrl: "http://127.0.0.1:8099",
+          model: "qwen",
+        });
+        const settings = await load(workspace, home);
+        const chosen = await effectiveProvider(settings, undefined, home);
+        expect(chosen.modelPath).toBe("E:/models/qwen.gguf");
+      });
+    });
+  });
+});

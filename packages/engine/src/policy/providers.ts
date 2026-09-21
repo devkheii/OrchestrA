@@ -26,6 +26,15 @@ export interface ProviderConfig {
   model?: string | undefined;
   /** A reference — `secret://name` or `env://NAME` — never a literal. */
   apiKey?: string | undefined;
+  /**
+   * Weights the harness serves at this endpoint.
+   *
+   * Paired with the endpoint, not global. At the top level it applied to
+   * whichever provider happened to be selected, so choosing a remote one
+   * loaded 5.8GB of local weights first, waited for them, and then talked to
+   * the remote endpoint anyway.
+   */
+  modelPath?: string | undefined;
 }
 
 export interface ChosenProvider {
@@ -36,6 +45,8 @@ export interface ChosenProvider {
   model?: string | undefined;
   /** Resolved value, not the reference. Never written back into settings. */
   apiKey?: string | undefined;
+  /** Set only when this endpoint's weights are ours to serve. */
+  modelPath?: string | undefined;
 }
 
 /**
@@ -68,7 +79,7 @@ export async function effectiveProvider(
     // A built-in kind brings its own transport, so a `baseUrl` left in config
     // for the OpenAI-compatible path must not follow it. It did, and a
     // `--provider fake` run went to a real endpoint.
-    const { baseUrl: _ignored, ...rest } = topLevel(settings);
+    const { baseUrl: _url, modelPath: _weights, ...rest } = topLevel(settings);
     return withKey({ name: asked, ...rest, kind: asked }, home);
   }
 
@@ -111,6 +122,7 @@ function topLevel(settings: Settings): ProviderConfig {
     ...(settings.baseUrl ? { baseUrl: settings.baseUrl } : {}),
     ...(settings.model ? { model: settings.model } : {}),
     ...(settings.apiKey ? { apiKey: settings.apiKey } : {}),
+    ...(settings.modelPath ? { modelPath: settings.modelPath } : {}),
   };
 }
 

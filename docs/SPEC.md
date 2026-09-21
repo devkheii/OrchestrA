@@ -1788,6 +1788,13 @@ The split is the point. Endpoints, model names, and *which* credential to use
 are not secret; they belong in a file that can be committed and reviewed. The
 credential is not in that file — only its name is.
 
+A `modelPath` — weights the harness serves itself — belongs to the entry whose
+endpoint serves them, not to the configuration as a whole. At the top level it
+applied to whichever provider happened to be selected, so choosing a remote one
+loaded several gigabytes locally, waited for them, and then talked to the
+remote endpoint anyway. The flat form still works for a single-endpoint setup,
+where there is only one endpoint for it to mean.
+
 Selection: an explicit `--provider <name>`, else `"provider"` in config, else
 the only configured entry when there is exactly one. **When several are
 configured and none is chosen, this is an error rather than a default.**

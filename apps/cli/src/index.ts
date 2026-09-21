@@ -419,11 +419,15 @@ async function withDaemon(
   // loading weights for a provider the run will not use costs minutes and
   // then fails a smoke test against a server nothing asked for.
   const usesConfiguredEndpoint = !chosen.kind;
-  if (usesConfiguredEndpoint && settings.modelPath && settings.baseUrl) {
+  // Weights belong to the endpoint they are served at, not to the session.
+  // Read from the chosen provider: with `modelPath` at the top level and a
+  // remote provider selected, this loaded 5.8GB, waited for it, and then
+  // talked to the remote endpoint anyway.
+  if (usesConfiguredEndpoint && chosen.modelPath && chosen.baseUrl) {
     try {
-      io.err(`\u001b[2mstarting a model server at ${settings.baseUrl}\u001b[0m\n`);
-      modelServer = await ensureModelServer(settings.baseUrl, {
-        modelPath: settings.modelPath,
+      io.err(`\u001b[2mstarting a model server at ${chosen.baseUrl}\u001b[0m\n`);
+      modelServer = await ensureModelServer(chosen.baseUrl, {
+        modelPath: chosen.modelPath,
         command: settings.llamaCommand,
         contextSize: settings.contextSize,
         // Loading several gigabytes takes a while, and a terminal that shows
@@ -458,14 +462,14 @@ async function withDaemon(
   // reasoning was about the failure modes, and it skipped the one thing every
   // endpoint can fail at: being reachable. A configured remote provider went
   // straight into a session that could not answer a single message.
-  const checkable = usesConfiguredEndpoint && Boolean(chosen.baseUrl ?? settings.modelPath);
+  const checkable = usesConfiguredEndpoint && Boolean(chosen.baseUrl ?? chosen.modelPath);
 
   let toolCalling: boolean | undefined;
   if (checkable && !settings.skipSmokeTest) {
     const smokeConfig = {
       model: chosen.model ?? settings.model,
       baseUrl: chosen.baseUrl ?? settings.baseUrl,
-      modelPath: settings.modelPath,
+      modelPath: chosen.modelPath,
       args: settings.llamaArgs,
     };
     const smoke = await runSmokeTest(provider, {

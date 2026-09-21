@@ -122,6 +122,8 @@ function buildChoices(
         apply: async (config) => {
           config["baseUrl"] = `${server.baseUrl}/v1`;
           if (model) config["model"] = model;
+          // Weights belong to the endpoint they are served at (SPEC 33.2), and
+          // this endpoint is someone else's server.
           delete config["modelPath"];
         },
       });
