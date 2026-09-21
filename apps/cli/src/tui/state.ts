@@ -21,6 +21,14 @@ export interface PendingApproval {
   tool: string;
   subject: string;
   rule: string;
+  /**
+   * Whether this command provably only reads (SPEC 19.2).
+   *
+   * Offers a scope the user may grant once for the session, instead of being
+   * asked six times to explore one directory. Nothing is granted by being
+   * read-only; it only bounds what the user's own choice can cover.
+   */
+  readOnly?: boolean;
 }
 
 export interface SelectOption {

@@ -2,7 +2,13 @@ import type { DaemonHandle } from "@dem/protocol";
 import type { Settings } from "@dem/engine";
 import { createSession, runTurn, type Approver, type Io } from "../session-ui.js";
 import { runSessionCommand, type CommandOption } from "../session-commands.js";
-import { discoverServers, discoverWeights, humanSize, labelForModels } from "@dem/engine";
+import {
+  discoverServers,
+  discoverWeights,
+  humanSize,
+  isReadOnlyCommand,
+  labelForModels,
+} from "@dem/engine";
 import { appendDelta, line, settle, trim, type Prompt, type SessionState } from "./state.js";
 
 /**
@@ -106,6 +112,12 @@ export async function createDriver(options: {
   // subject: yes to `npm test` is not yes to `rm -rf build` (SPEC §19).
   const allowed = new Set<string>();
 
+  // And one broader scope the user may grant: read-only shell commands, for
+  // the session. Not a decision that `ls` is safe — a decision the user makes
+  // once instead of a dozen times, bounded to commands that provably only
+  // read (SPEC §19.2).
+  let allowReadOnly = false;
+
   const approve: Approver = async (pending) => {
     const subject =
       typeof pending.call.arguments["command"] === "string"
@@ -113,18 +125,29 @@ export async function createDriver(options: {
         : JSON.stringify(pending.call.arguments);
     const key = `${pending.call.name}:${subject}`;
 
-    if (allowed.has(key)) {
+    const readOnly = pending.call.name === "shell" && isReadOnlyCommand(subject);
+
+    if (allowed.has(key) || (readOnly && allowReadOnly)) {
       say("tool", `${pending.call.name} ${subject}  (allowed earlier)`);
       return true;
     }
 
     const answer = await askThrough({
       kind: "approval",
-      pending: { tool: pending.call.name, subject, rule: pending.rule },
+      pending: {
+        tool: pending.call.name,
+        subject,
+        rule: pending.rule,
+        ...(readOnly ? { readOnly: true } : {}),
+      },
     });
 
     if (answer === "a") {
       allowed.add(key);
+      return true;
+    }
+    if (answer === "r" && readOnly) {
+      allowReadOnly = true;
       return true;
     }
     return answer === "y";

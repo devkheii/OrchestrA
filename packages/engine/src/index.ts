@@ -3,6 +3,7 @@ export * from "./policy/config.js";
 export * from "./policy/budget.js";
 export * from "./policy/egress.js";
 export * from "./permissions/broker.js";
+export * from "./permissions/read-only.js";
 export * from "./secrets/broker.js";
 export * from "./context/trust.js";
 export * from "./audit/log.js";

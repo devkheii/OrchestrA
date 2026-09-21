@@ -796,6 +796,46 @@ This is a deliberate scope decision, not a defect. v0.1 ships a harness whose mo
 
 ---
 
+### 19.2 A read-only scope, granted by the user
+
+`AUTO` needs a sandbox and does not ship in v0.1 (invariant 21), so every shell
+call is asked about. Exploring a codebase is `ls`, `cat`, `grep`, `find` — one
+question each. Measured on a real session: six approvals to answer "what is
+this project?".
+
+An approval asked that often stops being read, and an approval nobody reads is
+worse than none. That is the same argument that produced the "always this
+session" scope, and it does not reach far enough: the exact-command scope does
+not help when every command is different.
+
+So a fourth scope exists, offered **only** when the command provably reads and
+nothing else:
+
+```text
+No
+Yes, once
+Yes, and stop asking for this exact command
+Yes, and stop asking for read-only commands this session
+```
+
+**This is not a decision that `ls` is safe.** Nothing is granted by being
+read-only. The user grants a scope, once, and the classification only bounds
+what that grant can cover. The decision stays where it was.
+
+The classification is an allowlist of verbs and a refusal of anything that
+could reach a second command — operators, substitutions, redirects, and flags
+like `find -exec` or `git --ext-diff` that turn a reading command into one that
+runs. A verb nobody has thought about asks, which is the only safe default.
+Allowlist over denylist is a rule this project has broken twice and paid for
+twice.
+
+The scope is held in memory for the session, never written, and does not
+survive `/new` or a restart — the same properties as the exact-command scope
+(§19).
+
+It does not raise the permission ceiling. `patch`, `terminal`, `network` and
+anything destructive still ask every time, and `AUTO` is still not offered.
+
 ## 20. Secrets
 
 Secret resolution order:

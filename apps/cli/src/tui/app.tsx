@@ -216,7 +216,7 @@ function Approval({
   pending,
   onAnswer,
 }: {
-  pending: { tool: string; subject: string; rule: string };
+  pending: { tool: string; subject: string; rule: string; readOnly?: boolean };
   onAnswer: (answer: string) => void;
 }) {
   return (
@@ -231,6 +231,18 @@ function Approval({
           { key: "no", label: "No", value: "n" },
           { key: "yes", label: "Yes, once", value: "y" },
           { key: "always", label: "Yes, and stop asking for this exact command", value: "a" },
+          // Offered only when the command provably only reads. Exploring a
+          // codebase is a dozen of these, and an approval asked a dozen times
+          // stops being read.
+          ...(pending.readOnly
+            ? [
+                {
+                  key: "reads",
+                  label: "Yes, and stop asking for read-only commands this session",
+                  value: "r",
+                },
+              ]
+            : []),
         ]}
         onSelect={(item) => onAnswer(String(item.value))}
       />
