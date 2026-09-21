@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { join } from "node:path";
 import { CAP_TEXT_GENERATE } from "@dem/protocol";
 import type { ModelEvent, ModelRequest, Provider, ProviderHealth } from "@dem/protocol";
-import { SMOKE_TASKS, configFingerprint, readSmokeResult, runSmokeTest } from "@dem/engine";
+import {
+  SMOKE_TASKS,
+  configFingerprint,
+  probeToolCalling,
+  readSmokeResult,
+  runSmokeTest,
+} from "@dem/engine";
 import { withTempDir } from "../helpers/temp.js";
 
 /**
@@ -322,5 +328,78 @@ describe("A failed request is not a wrong answer", () => {
     const result = await runSmokeTest(mostly);
     expect(result.unreachable).toBe(false);
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("Whether this configuration can call tools", () => {
+  /**
+   * Invariant 41 ends: "A provider that cannot call tools is told so and is
+   * offered none." The harness was doing the opposite.
+   *
+   * An OpenAI-compatible adapter cannot know this from its own class. Whether
+   * tool calls work depends on the server and on the chat template baked into
+   * the weights — llama.cpp serving a GGUF whose template has no tool section
+   * accepts the `tools` field and ignores it. The model, told it has tools,
+   * writes a call as text, and invariant 41 correctly refuses to act on it.
+   *
+   * Which is right, and leaves the user with a harness that answers every
+   * message with a refusal. Asked on a real Qwen2.5-Coder served by llama.cpp:
+   * "hi" produced a shell call in a JSON code fence.
+   *
+   * So it is probed once, with the rest of the configuration.
+   */
+  const calls: Provider = {
+    id: "calls",
+    capabilities: () => [CAP_TEXT_GENERATE],
+    async *run(): AsyncIterable<ModelEvent> {
+      yield { type: "tool_call", call: { id: "1", name: "probe", arguments: {} } };
+      yield { type: "done", reason: "stop" };
+    },
+    health: async () => ({ ok: true, detail: "" }),
+  };
+
+  /** What llama.cpp with a tool-less template actually does. */
+  const writesCallsAsText: Provider = {
+    id: "writes",
+    capabilities: () => [CAP_TEXT_GENERATE],
+    async *run(): AsyncIterable<ModelEvent> {
+      yield { type: "delta", text: '```json\n{"name": "probe", "arguments": {}}\n```' };
+      yield { type: "done", reason: "stop" };
+    },
+    health: async () => ({ ok: true, detail: "" }),
+  };
+
+  it("sees a real tool call", async () => {
+    expect(await probeToolCalling(calls)).toBe(true);
+  });
+
+  it("does not mistake a call written as text for a call", async () => {
+    expect(await probeToolCalling(writesCallsAsText)).toBe(false);
+  });
+
+  it("treats a plain answer as no tool calling", async () => {
+    expect(await probeToolCalling(healthy)).toBe(false);
+  });
+
+  it("treats an error as no tool calling rather than assuming either way", async () => {
+    const failing: Provider = {
+      id: "failing",
+      capabilities: () => [CAP_TEXT_GENERATE],
+      async *run(): AsyncIterable<ModelEvent> {
+        yield { type: "error", message: "nope" };
+      },
+      health: async () => ({ ok: false, detail: "" }),
+    };
+    expect(await probeToolCalling(failing)).toBe(false);
+  });
+
+  it("is recorded with the rest of the verdict, so it is probed once", async () => {
+    await withTempDir(async (dir) => {
+      const config = { model: "m", baseUrl: "http://127.0.0.1:1" };
+      const result = await runSmokeTest(healthy, { config, cacheDir: dir, probeTools: true });
+
+      expect(result.toolCalling).toBe(false);
+      expect((await readSmokeResult(config, dir))?.toolCalling).toBe(false);
+    });
   });
 });

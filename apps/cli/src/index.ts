@@ -453,6 +453,7 @@ async function withDaemon(
     providerFromSettings(settings).local &&
     Boolean(settings.modelPath ?? settings.baseUrl);
 
+  let toolCalling: boolean | undefined;
   if (servesLocally && !settings.skipSmokeTest) {
     const smokeConfig = {
       model: settings.model,
@@ -460,7 +461,15 @@ async function withDaemon(
       modelPath: settings.modelPath,
       args: settings.llamaArgs,
     };
-    const smoke = await runSmokeTest(provider, { config: smokeConfig, cacheDir: stateDir });
+    const smoke = await runSmokeTest(provider, {
+      config: smokeConfig,
+      cacheDir: stateDir,
+      // Asked here because it is the one place that already proves a
+      // configuration, and because offering tools to an endpoint that cannot
+      // call them makes every message come back a refusal (invariant 41).
+      probeTools: true,
+    });
+    toolCalling = smoke.toolCalling;
     if (!smoke.ok) {
       io.err(`dem: ${explainSmokeFailure(smoke, smokeConfig)}
 `);
@@ -469,6 +478,16 @@ async function withDaemon(
       if (modelServer?.started) await modelServer.stop();
       return 1;
     }
+  }
+
+  // Rebuilt when the probe says this endpoint does not call tools, so the
+  // agent loop offers none and tells the model so, rather than dangling tools
+  // it cannot use in front of it.
+  if (toolCalling === false && !chosen.kind) {
+    provider = providerFromChosen({ ...chosen, toolCalling: false }, settings.allowRemote).provider;
+    io.err(
+      `[2mthis model cannot call tools, so none are offered[0m\n`,
+    );
   }
 
   const daemon = await startDaemon({ workspace: process.cwd(), stateDir, provider });

@@ -125,12 +125,23 @@ export interface SmokeResult {
    * loading its weights.
    */
   unreachable: boolean;
+  /**
+   * Whether a tool offered to this configuration comes back as a call.
+   *
+   * Undefined when it was not asked. An adapter cannot answer this from its
+   * own class: with an OpenAI-compatible endpoint it depends on the server and
+   * on the chat template inside the weights, and llama.cpp serving a GGUF
+   * whose template has no tool section accepts the field and ignores it.
+   */
+  toolCalling?: boolean;
   /** Set when the result was read from cache rather than measured now. */
   cached?: boolean;
 }
 
 export interface SmokeOptions {
   config?: SmokeConfig;
+  /** Also ask whether this configuration can call a tool (invariant 41). */
+  probeTools?: boolean;
   /** Where verdicts are cached. Omitted, nothing is written or read. */
   cacheDir?: string | undefined;
   /** Per-task ceiling. A task that needs longer than this is already wrong. */
@@ -180,6 +191,56 @@ export async function readSmokeResult(
   }
 }
 
+
+/**
+ * Can this configuration actually call a tool?
+ *
+ * Invariant 41 ends "a provider that cannot call tools is told so and is
+ * offered none", and the harness was doing the opposite: offering tools to a
+ * local model whose template cannot express them, which made the model write
+ * a call as text and the guard refuse it. Every message came back a refusal.
+ *
+ * One trivial tool, offered once. A model that answers in prose has not called
+ * anything, and neither has one that writes a call-shaped object into its
+ * answer — that is the fabrication invariant 41 exists for.
+ */
+export async function probeToolCalling(provider: Provider): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+
+  try {
+    for await (const event of provider.run(
+      {
+        messages: [
+          {
+            role: "user",
+            content: "Call the `probe` tool. Do not answer in text.",
+          },
+        ],
+        tools: [
+          {
+            name: "probe",
+            description: "A tool that exists only to see whether tools can be called.",
+            parameters: { type: "object", properties: {}, additionalProperties: false },
+          },
+        ],
+        maxOutputTokens: 128,
+        temperature: 0,
+      },
+      { signal: controller.signal },
+    )) {
+      if (event.type === "tool_call") return true;
+      if (event.type === "error") return false;
+    }
+    return false;
+  } catch {
+    // Unreachable, refused, or timed out. Not a claim that tools work.
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function runSmokeTest(
   provider: Provider,
   options: SmokeOptions = {},
@@ -219,6 +280,11 @@ export async function runSmokeTest(
     total: SMOKE_TASKS.length,
     failures,
     unreachable,
+    // Asked here so it is asked once, cached with everything else about this
+    // configuration, and re-asked when any of it changes.
+    ...(options.probeTools && !unreachable
+      ? { toolCalling: await probeToolCalling(provider) }
+      : {}),
   };
 
   if (options.config && options.cacheDir && !unreachable) {

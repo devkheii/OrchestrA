@@ -115,6 +115,9 @@ export async function createDriver(options: {
     if (!input || running) return;
 
     if (input.startsWith("/")) {
+      // Echoed like anything else the user typed. A command that produces
+      // output with no visible cause reads as the session acting on its own.
+      say("user", input);
       await command(input);
       return;
     }

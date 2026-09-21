@@ -984,6 +984,21 @@ It is cached by configuration — model file, quantization, and server flags —
 and re-run when any of those change, so the cost is paid once per setup rather
 than once per session.
 
+**Whether tools work is measured, not assumed.** Invariant 41 ends "a provider
+that cannot call tools is told so and is offered none", and an adapter cannot
+answer that from its own class. With an OpenAI-compatible endpoint it depends
+on the server *and* on the chat template inside the weights: llama.cpp serving
+a GGUF whose template has no tool section accepts the `tools` field and
+silently ignores it. The model, told it has tools, writes a call as text; the
+guard refuses to act on it, correctly; and every message the user sends comes
+back a refusal. Asked on a real Qwen2.5-Coder, "hi" produced a shell call in a
+JSON code fence.
+
+So one trivial tool is offered once, with the rest of the check, and the answer
+is cached with it. A model that replies in prose has not called anything, and
+neither has one that writes a call-shaped object into its answer — that is the
+fabrication the invariant exists for, and it must not be read as success here.
+
 **A failed request is not a wrong answer.** If nothing answered — the server
 is down, still loading its weights, or behind something refusing — then
 nothing was measured, and the result says so rather than blaming the model.

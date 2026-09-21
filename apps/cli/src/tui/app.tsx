@@ -62,6 +62,10 @@ export function App({ initial, subscribe, onSubmit, onAnswer, onCancel }: AppPro
   );
 }
 
+/** The longest usage string, plus a space, so no row runs into its summary. */
+const COMMAND_COLUMN =
+  Math.max(...SESSION_COMMANDS.map((c) => (c.usage ?? c.name).length)) + 2;
+
 function Header({ state }: { state: SessionState }) {
   const { workspace, label, local, mode } = state.header;
   return (
@@ -85,7 +89,9 @@ function Header({ state }: { state: SessionState }) {
         {SESSION_COMMANDS.map((command) => (
           <Text key={command.name} dimColor>
             {"  "}
-            {(command.usage ?? command.name).padEnd(38)}
+            {/* Wide enough for the longest usage string plus a gap. A
+                column that some rows overflow is worse than no column. */}
+            {(command.usage ?? command.name).padEnd(COMMAND_COLUMN)}
             {command.summary}
           </Text>
         ))}

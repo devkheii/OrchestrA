@@ -34,6 +34,8 @@ export interface ProviderEnv {
   ANTHROPIC_API_KEY?: string | undefined;
   /** Must be "1" to permit anything that sends context off this machine. */
   DEM_ALLOW_REMOTE?: string | undefined;
+  /** "0" when a probe found this endpoint does not call tools (invariant 41). */
+  DEM_TOOL_CALLING?: string | undefined;
 }
 
 /**
@@ -68,10 +70,17 @@ export function providerFromSettings(settings: {
  * every path to a provider passes through the same refusal.
  */
 export function providerFromChosen(
-  chosen: { kind?: string | undefined; baseUrl?: string | undefined; model?: string | undefined; apiKey?: string | undefined },
+  chosen: {
+    kind?: string | undefined;
+    baseUrl?: string | undefined;
+    model?: string | undefined;
+    apiKey?: string | undefined;
+    toolCalling?: boolean | undefined;
+  },
   allowRemote: boolean,
 ): ProviderSelection {
   return resolveProvider({
+    ...(chosen.toolCalling === false ? { DEM_TOOL_CALLING: "0" } : {}),
     ...(chosen.kind ? { DEM_PROVIDER: chosen.kind } : {}),
     ...(chosen.model ? { DEM_MODEL: chosen.model } : {}),
     ...(chosen.baseUrl ? { DEM_BASE_URL: chosen.baseUrl } : {}),
@@ -122,6 +131,7 @@ export function resolveProvider(env: ProviderEnv): ProviderSelection {
       baseUrl: env.DEM_BASE_URL,
       model: env.DEM_MODEL ?? "default",
       ...(env.DEM_API_KEY ? { apiKey: env.DEM_API_KEY } : {}),
+      ...(env.DEM_TOOL_CALLING === "0" ? { toolCalling: false } : {}),
     }),
     env,
     `${env.DEM_BASE_URL} is not loopback`,

@@ -27,6 +27,20 @@ export interface OpenAICompatibleConfig {
   /** Extra headers some gateways require. */
   headers?: Record<string, string>;
   timeoutMs?: number;
+  /**
+   * Whether this endpoint and model actually call tools.
+   *
+   * Not knowable from this class: it depends on the server and on the chat
+   * template inside the weights. llama.cpp serving a GGUF whose template has
+   * no tool section accepts the `tools` field and silently ignores it, and the
+   * model then writes a call as text — which invariant 41 refuses, correctly,
+   * leaving every message answered by a refusal.
+   *
+   * So it is measured (SPEC 25.3) and passed in. Absent means "assume yes",
+   * which is right for a hosted endpoint and gets corrected on the first run
+   * that probes.
+   */
+  toolCalling?: boolean;
 }
 
 /**
@@ -59,7 +73,9 @@ export class OpenAICompatibleProvider implements Provider {
   }
 
   capabilities(): readonly string[] {
-    return [CAP_TEXT_GENERATE, CAP_TEXT_REASON, CAP_TOOL_CALL];
+    return this.config.toolCalling === false
+      ? [CAP_TEXT_GENERATE, CAP_TEXT_REASON]
+      : [CAP_TEXT_GENERATE, CAP_TEXT_REASON, CAP_TOOL_CALL];
   }
 
   /**
