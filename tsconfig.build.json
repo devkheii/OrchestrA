@@ -8,6 +8,6 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
-  "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts"],
+  "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "apps/*/src/**/*.tsx"],
   "exclude": ["tests/**", "scripts/**"]
 }

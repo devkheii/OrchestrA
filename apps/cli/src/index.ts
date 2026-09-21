@@ -16,6 +16,7 @@ import { ClaudeCodeAgent, CodexAgent } from "@dem/adapters";
 import type { ProposedChange } from "@dem/engine";
 import type { DaemonHandle, SessionEvent } from "@dem/protocol";
 import { runInteractive } from "./interactive.js";
+import { runTui } from "./tui/index.js";
 import { readLine, runOnce, showLog } from "./commands.js";
 import { runAuth } from "./auth.js";
 import { runSetup, SETUP_DONE } from "./setup.js";
@@ -24,6 +25,8 @@ export { createSession, renderSince, runTurn } from "./session-ui.js";
 export type { Approver, PendingCall } from "./session-ui.js";
 export { sessionApprover } from "./interactive.js";
 export { runSessionCommand, SESSION_COMMANDS } from "./session-commands.js";
+export { appendDelta, line, settle, trim } from "./tui/state.js";
+export type { Line, Prompt, SessionState } from "./tui/state.js";
 export type { SessionCommand, SessionCommandResult } from "./session-commands.js";
 export type { Ask } from "./interactive.js";
 
@@ -183,7 +186,12 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
 
       return withDaemon(settings, io, (daemon) => {
         const selection = providerFromSettings(settings);
-        return runInteractive(daemon, settings, process.cwd(), selection.local, selection.label, io);
+        // The full-screen session. `runInteractive` remains the line-based
+        // one, used where a renderer cannot run — a dumb terminal, a CI log —
+        // and both drive the same turn, approval and command code.
+        return process.env["DEM_PLAIN"]
+          ? runInteractive(daemon, settings, process.cwd(), selection.local, selection.label, io)
+          : runTui(daemon, settings, process.cwd(), selection.local, selection.label);
       });
 
     case "help":

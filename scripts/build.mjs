@@ -1,55 +1,85 @@
 #!/usr/bin/env node
 /**
- * Build a runnable `dem` (plan: install on PATH).
+ * Build a runnable `dem`.
  *
- * tsc's `paths` are a compile-time fiction: the emitted JavaScript still says
- * `@dem/engine`, and node resolves that to a package whose "main" is a .ts
- * file it cannot run. So after emitting, rewrite every workspace specifier to
- * the relative path of the emitted file it meant.
+ * Bundled rather than emitted file-by-file. The earlier build wrote the
+ * monorepo's shape into `dist/` and rewrote the `@dem/*` specifiers, which
+ * worked only because every third-party dependency it needed happened to be
+ * declared at the root: `dist/apps/cli/src/...` resolves upward to
+ * `<repo>/node_modules`, and pnpm puts a package's own dependencies in that
+ * package's directory. The first dependency added to `apps/cli` alone — ink —
+ * broke the installed command while every test passed, because the tests run
+ * from source where resolution is correct.
  *
- * A bundler would do this too. This is twenty lines and leaves the output
- * readable, which matters for a harness whose claim is that you can audit it.
+ * A bundle has no resolution to get wrong. It also makes `dem` a single file,
+ * which is what a command on someone's PATH should be.
+ *
+ * Native modules stay external: they load `.node` binaries that cannot be
+ * bundled, and they are declared at the root, which is where the bundle
+ * resolves them from.
  */
-import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, readdirSync, statSync, chmodSync } from "node:fs";
-import { join, relative, dirname, sep } from "node:path";
+import { build } from "esbuild";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = process.cwd();
-const dist = join(root, "dist");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const outfile = join(root, "dist", "dem.mjs");
 
-const TARGETS = {
-  "@dem/protocol": "packages/protocol/src/index.js",
-  "@dem/engine": "packages/engine/src/index.js",
-  "@dem/adapters": "packages/adapters/src/index.js",
-  "@dem/daemon": "apps/daemon/src/index.js",
-  "@dem/cli": "apps/cli/src/index.js",
-};
+const EXTERNAL = [
+  // Load .node binaries.
+  "better-sqlite3",
+  "node-pty",
+  // Optional at runtime and large; required only by the Anthropic provider.
+  "@anthropic-ai/sdk",
+];
 
-execFileSync("npx", ["tsc", "-p", "tsconfig.build.json"], { stdio: "inherit", shell: process.platform === "win32" });
+const result = await build({
+  entryPoints: [join(root, "apps", "cli", "src", "bin.ts")],
+  outfile,
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  external: EXTERNAL,
+  // Workspace packages are source, not built artifacts, so the bundler is
+  // told where the names point rather than being left to npm resolution.
+  alias: {
+    "@dem/protocol": join(root, "packages", "protocol", "src", "index.ts"),
+    "@dem/engine": join(root, "packages", "engine", "src", "index.ts"),
+    "@dem/adapters": join(root, "packages", "adapters", "src", "index.ts"),
+    "@dem/daemon": join(root, "apps", "daemon", "src", "index.ts"),
+    "@dem/cli": join(root, "apps", "cli", "src", "index.ts"),
+    // Ink imports this at load and uses it only behind a development flag a
+    // released command never sets. External left a real import that failed at
+    // startup; bundling it would put a debugger in the binary.
+    "react-devtools-core": join(root, "scripts", "shims", "empty.mjs"),
+  },
+  jsx: "automatic",
+  // Readable output. A harness whose claim is that you can audit it should not
+  // ship a minified blob, and the size difference is not worth the opacity.
+  minify: false,
+  sourcemap: false,
+  banner: {
+    js: [
+      // No shebang here: esbuild preserves the entry point's own, and two
+      // of them makes the second line a syntax error.
+      // esbuild's ESM output has no `require`, which some transitive CommonJS
+      // still reaches for.
+      "import { createRequire as __createRequire } from 'node:module';",
+      "const require = __createRequire(import.meta.url);",
+    ].join("\n"),
+  },
+  logLevel: "warning",
+});
 
-function* walk(dir) {
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) yield* walk(path);
-    else if (path.endsWith(".js")) yield path;
-  }
-}
+if (result.errors.length) process.exit(1);
 
-let rewritten = 0;
-for (const file of walk(dist)) {
-  const before = readFileSync(file, "utf8");
-  let after = before;
-  for (const [spec, target] of Object.entries(TARGETS)) {
-    let rel = relative(dirname(file), join(dist, target)).split(sep).join("/");
-    if (!rel.startsWith(".")) rel = `./${rel}`;
-    after = after.replaceAll(`"${spec}"`, `"${rel}"`);
-  }
-  if (after !== before) {
-    writeFileSync(file, after);
-    rewritten++;
-  }
-}
+await chmod(outfile, 0o755);
 
-const bin = join(dist, "apps/cli/src/bin.js");
-chmodSync(bin, 0o755);
-console.log(`built ${bin} (${rewritten} files rewired)`);
+// A package.json beside the bundle, so node reads it as ESM regardless of what
+// the directory above says.
+await mkdir(dirname(outfile), { recursive: true });
+await writeFile(join(root, "dist", "package.json"), JSON.stringify({ type: "module" }, null, 2));
+
+console.log(`built ${outfile}`);

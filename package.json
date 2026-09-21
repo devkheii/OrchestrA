@@ -22,6 +22,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.10.2",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.13",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
@@ -32,6 +33,6 @@
     "node-pty": "^1.1.0"
   },
   "bin": {
-    "dem": "./dist/apps/cli/src/bin.js"
+    "dem": "./dist/dem.mjs"
   }
 }
