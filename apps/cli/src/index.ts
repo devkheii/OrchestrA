@@ -9,6 +9,7 @@ import {
   explainSmokeFailure,
   resolveSettings,
   runSmokeTest,
+  writeCredential,
   type ModelServer,
   type Settings,
 } from "@dem/engine";
@@ -20,6 +21,7 @@ import { runTui } from "./tui/index.js";
 import { readLine, runOnce, showLog } from "./commands.js";
 import { runAuth } from "./auth.js";
 import { runSetup, SETUP_DONE } from "./setup.js";
+
 import { pickAtStart } from "./tui/start.js";
 import { readFile as readConfigFile, writeFile as writeConfigFile, mkdir as makeDir } from "node:fs/promises";
 
@@ -175,16 +177,10 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
         io.out(HELP);
         return 0;
       }
-      // Nothing configured means setup, not a fake provider that echoes the
-      // question back. Appearing to work spends a user's trust before the
-      // tool has done anything with it.
-      if (!isConfigured(settings)) {
-        const code = await runSetup(io, process.cwd());
-        if (code !== SETUP_DONE) return code;
-        // Straight into the session the user came for. Re-read, because setup
-        // just wrote the config this run was started without.
-        settings = await settingsFor(rawArgv);
-      }
+      // No separate first-run path. The menu below handles an empty config
+      // the same way it handles a full one — it lists what is on the machine
+      // and offers to add what is not — so a new user and a returning one see
+      // the same screen rather than two that show the same things differently.
 
       // Choose before connecting.
       //
@@ -422,18 +418,46 @@ async function startMenu(
 
   if (choice.cancelled) return undefined;
 
-  if (choice.setup) {
-    const code = await runSetup(io, workspace);
-    return code === SETUP_DONE ? true : undefined;
-  }
-
   const path = join(workspace, ".dem", "config.json");
   let config: Record<string, unknown> = {};
   try {
     const parsed = JSON.parse(await readConfigFile(path, "utf8"));
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) config = parsed;
   } catch {
-    // No config yet, which a discovered endpoint is about to create.
+    // No config yet, which a chosen endpoint is about to create.
+  }
+
+
+  if (choice.manual) {
+    // Collected by the menu itself. Dropping out to a readline prompt after
+    // Ink has unmounted reads nothing — Ink leaves stdin in raw mode, so the
+    // questions appeared and the process exited without taking an answer.
+    const entered = choice.manual;
+    const providers = (config["providers"] ?? {}) as Record<string, unknown>;
+
+    const provider: Record<string, unknown> = { baseUrl: entered.baseUrl };
+    if (entered.model) provider["model"] = entered.model;
+
+    if (entered.apiKey) {
+      // Into the credential store, never into the config file (invariant 6).
+      await writeCredential(entered.name, entered.apiKey, homedir());
+      provider["apiKey"] = `secret://${entered.name}`;
+    }
+
+    providers[entered.name] = provider;
+    config["providers"] = providers;
+    config["provider"] = entered.name;
+
+    if (!/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])/.test(entered.baseUrl)) {
+      io.err(
+        "[2mthis endpoint is not on this machine; prompts and files read will be sent to it[0m\n",
+      );
+      config["allowRemote"] = true;
+    }
+
+    await makeDir(join(workspace, ".dem"), { recursive: true });
+    await writeConfigFile(path, JSON.stringify(config, null, 2) + "\n");
+    return true;
   }
 
   if (choice.provider) {
