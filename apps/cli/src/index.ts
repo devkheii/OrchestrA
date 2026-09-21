@@ -23,6 +23,7 @@ import { runAuth } from "./auth.js";
 import { runSetup, SETUP_DONE } from "./setup.js";
 
 import { pickAtStart } from "./tui/start.js";
+import { applyStartChoice } from "./tui/apply-choice.js";
 import { readFile as readConfigFile, writeFile as writeConfigFile, mkdir as makeDir } from "node:fs/promises";
 
 export { createSession, renderSince, runTurn } from "./session-ui.js";
@@ -30,6 +31,7 @@ export type { Approver, PendingCall } from "./session-ui.js";
 export { sessionApprover } from "./interactive.js";
 export { otherProviders, runSessionCommand, SESSION_COMMANDS } from "./session-commands.js";
 export { appendDelta, line, settle, trim } from "./tui/state.js";
+export { applyStartChoice } from "./tui/apply-choice.js";
 export type { Line, Prompt, SessionState } from "./tui/state.js";
 export type { SessionCommand, SessionCommandResult } from "./session-commands.js";
 export type { Ask } from "./interactive.js";
@@ -460,20 +462,10 @@ async function startMenu(
     return true;
   }
 
-  if (choice.provider) {
-    config["provider"] = choice.provider;
-  } else if (choice.newEndpoint) {
-    // A discovered endpoint becomes the flat configuration, and any named
-    // selection is cleared so it does not override what was just chosen.
-    config["baseUrl"] = choice.newEndpoint.baseUrl;
-    if (choice.newEndpoint.model) config["model"] = choice.newEndpoint.model;
-    delete config["provider"];
-    // Weights belong to the endpoint that serves them; a discovered server is
-    // not ours to serve.
-    if (!choice.newEndpoint.baseUrl.includes("127.0.0.1:8099")) delete config["modelPath"];
-  } else {
+  if (!choice.provider && !choice.newEndpoint) {
     return true; // The flat configuration, already what settings say.
   }
+  applyStartChoice(config, choice);
 
   await makeDir(join(workspace, ".dem"), { recursive: true });
   await writeConfigFile(path, JSON.stringify(config, null, 2) + "\n");

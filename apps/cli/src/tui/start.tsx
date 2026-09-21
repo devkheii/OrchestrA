@@ -33,7 +33,9 @@ export interface StartChoice {
   /** A configured provider name, or undefined for the flat configuration. */
   provider?: string | undefined;
   /** A discovered endpoint the user picked, to be written before connecting. */
-  newEndpoint?: { baseUrl: string; model?: string | undefined } | undefined;
+  newEndpoint?:
+    | { baseUrl: string; model?: string | undefined; modelPath?: string | undefined }
+    | undefined;
   /** An endpoint this menu could not discover, typed in full. */
   manual?: ManualProvider | undefined;
   /** The user left without choosing. */
@@ -122,6 +124,8 @@ function Start({
               newEndpoint: {
                 baseUrl: "http://127.0.0.1:8099",
                 model: name.replace(/\.gguf$/i, ""),
+                // Weights travel with the endpoint that serves them.
+                modelPath: w.path,
               },
             } as StartChoice,
           };

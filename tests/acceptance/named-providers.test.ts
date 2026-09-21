@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { effectiveProvider, resolveSettings, writeCredential } from "@dem/engine";
+import { applyStartChoice } from "@dem/cli";
 import { withTempDir } from "../helpers/temp.js";
 
 /**
@@ -256,5 +257,86 @@ describe("Which endpoint the weights belong to", () => {
         expect(chosen.modelPath).toBe("E:/models/qwen.gguf");
       });
     });
+  });
+});
+
+describe("What the start menu writes", () => {
+  /**
+   * From a real session: a GGUF was chosen from the menu and the run failed
+   * with "several providers are configured and none is chosen".
+   *
+   * The choice was written as the flat configuration while two named
+   * providers stayed in the file, and named providers are what selection
+   * looks at. The menu had made a choice that selection could not see.
+   *
+   * So every choice becomes a named provider. One mechanism, one place a
+   * selection can live.
+   */
+  it("registers a discovered endpoint as a named provider and selects it", () => {
+    const config: Record<string, unknown> = {
+      providers: { openai: { baseUrl: "http://10.0.0.1/v1" } },
+    };
+    applyStartChoice(config, {
+      newEndpoint: { baseUrl: "http://127.0.0.1:11434/v1", model: "qwen-coder:latest" },
+    });
+
+    const providers = config["providers"] as Record<string, Record<string, unknown>>;
+    expect(config["provider"]).toBeTruthy();
+    expect(providers[config["provider"] as string]?.["baseUrl"]).toBe(
+      "http://127.0.0.1:11434/v1",
+    );
+    // The one that was already there is left alone.
+    expect(providers["openai"]?.["baseUrl"]).toBe("http://10.0.0.1/v1");
+  });
+
+  it("keeps weights on the entry that serves them", () => {
+    const config: Record<string, unknown> = {};
+    applyStartChoice(config, {
+      newEndpoint: {
+        baseUrl: "http://127.0.0.1:8099",
+        model: "qwen2.5-coder",
+        modelPath: "E:/models/qwen.gguf",
+      },
+    });
+
+    const providers = config["providers"] as Record<string, Record<string, unknown>>;
+    const entry = providers[config["provider"] as string];
+    expect(entry?.["modelPath"]).toBe("E:/models/qwen.gguf");
+    // Not at the top level, where it would apply to whichever provider is
+    // selected next.
+    expect(config["modelPath"]).toBeUndefined();
+  });
+
+  it("selects an existing provider without rewriting it", () => {
+    const config: Record<string, unknown> = {
+      providers: { a: { baseUrl: "http://10.0.0.1/v1", model: "m" } },
+    };
+    applyStartChoice(config, { provider: "a" });
+
+    expect(config["provider"]).toBe("a");
+    expect((config["providers"] as Record<string, unknown>)["a"]).toEqual({
+      baseUrl: "http://10.0.0.1/v1",
+      model: "m",
+    });
+  });
+
+  it("gives a second endpoint from the same model a distinct name", () => {
+    const config: Record<string, unknown> = {};
+    applyStartChoice(config, { newEndpoint: { baseUrl: "http://a/v1", model: "qwen" } });
+    const first = config["provider"] as string;
+    applyStartChoice(config, { newEndpoint: { baseUrl: "http://b/v1", model: "qwen" } });
+    const second = config["provider"] as string;
+
+    expect(second).not.toBe(first);
+    expect(Object.keys(config["providers"] as Record<string, unknown>)).toHaveLength(2);
+  });
+
+  it("does not clear a selection it did not replace", () => {
+    const config: Record<string, unknown> = {
+      provider: "a",
+      providers: { a: { baseUrl: "http://10.0.0.1/v1" } },
+    };
+    applyStartChoice(config, {});
+    expect(config["provider"]).toBe("a");
   });
 });
