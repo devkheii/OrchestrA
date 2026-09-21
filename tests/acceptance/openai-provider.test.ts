@@ -286,3 +286,76 @@ describe("SEC-024: a stream that stops is not a stream that finished (invariant 
     }
   });
 });
+
+describe("A baseUrl that already names a version path", () => {
+  /**
+   * Found by using the product, not by a test.
+   *
+   * `dem setup` discovers a running Ollama and writes
+   * `http://127.0.0.1:11434/v1`, which is what every provider's own
+   * documentation tells you to configure. The adapter then appended `/v1`
+   * again and asked for `/v1/v1/chat/completions`, so the setup wizard wrote a
+   * configuration that could not work — the exact opposite of what it exists
+   * for.
+   *
+   * The same bug occurred in the experiment runner and was fixed there first.
+   * It was not looked for here, which is the argument for running the thing
+   * rather than only its tests.
+   */
+  it("does not append a second /v1", async () => {
+    const endpoint = await startFakeOpenAI({ frames: [delta("hi"), finish("stop")] });
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: `${endpoint.url}/v1`,
+        model: "m",
+      });
+      const events = await collect(provider.run({ messages: [{ role: "user", content: "x" }] }));
+
+      expect(events.some((e) => e.type === "error")).toBe(false);
+      expect(events).toContainEqual({ type: "delta", text: "hi" });
+    } finally {
+      await endpoint.close();
+    }
+  });
+
+  it("still appends /v1 when the baseUrl omits it", async () => {
+    const endpoint = await startFakeOpenAI({ frames: [delta("hi"), finish("stop")] });
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: endpoint.url, model: "m" });
+      const events = await collect(provider.run({ messages: [{ role: "user", content: "x" }] }));
+      expect(events).toContainEqual({ type: "delta", text: "hi" });
+    } finally {
+      await endpoint.close();
+    }
+  });
+
+  it("tolerates a trailing slash either way", async () => {
+    for (const suffix of ["/", "/v1/"]) {
+      const endpoint = await startFakeOpenAI({ frames: [delta("ok"), finish("stop")] });
+      try {
+        const provider = new OpenAICompatibleProvider({
+          baseUrl: `${endpoint.url}${suffix}`,
+          model: "m",
+        });
+        const events = await collect(provider.run({ messages: [{ role: "user", content: "x" }] }));
+        expect(events).toContainEqual({ type: "delta", text: "ok" });
+      } finally {
+        await endpoint.close();
+      }
+    }
+  });
+
+  it("reports health against the same path it will actually use", async () => {
+    const endpoint = await startFakeOpenAI({ frames: [] });
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: `${endpoint.url}/v1`,
+        model: "m",
+      });
+      const health = await provider.health();
+      expect(health.ok).toBe(true);
+    } finally {
+      await endpoint.close();
+    }
+  });
+});

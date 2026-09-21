@@ -84,6 +84,12 @@ const TOLERATED_FAILURES = 1;
 export interface SmokeConfig {
   /** Model identifier as configured. */
   model?: string | undefined;
+  /**
+   * The endpoint. Fingerprinted because pointing at a different server is a
+   * different deployment — and because leaving it out meant a verdict about
+   * one endpoint was served for another.
+   */
+  baseUrl?: string | undefined;
   /** Path to the weights, when the harness serves them itself. */
   modelPath?: string | undefined;
   /** Server flags. `-ctk q4_0` lives here, which is why it is fingerprinted. */
@@ -126,11 +132,21 @@ export interface SmokeOptions {
 export function configFingerprint(config: SmokeConfig): string {
   const canonical = JSON.stringify({
     model: config.model ?? "",
+    baseUrl: config.baseUrl ?? "",
     modelPath: config.modelPath ?? "",
     args: [...(config.args ?? [])],
+    // A verdict is about a configuration *and* the code that judged it. A bug
+    // in this harness once made every endpoint answer 404, and the cached
+    // "not working" outlived the fix — so a user who upgraded would keep being
+    // told their working setup was broken. Bump this when the outcome of the
+    // check could change for reasons that are ours rather than theirs.
+    checker: CHECKER_VERSION,
   });
   return createHash("sha256").update(canonical).digest("hex").slice(0, 16);
 }
+
+/** Raised when a harness change could alter a verdict. See above. */
+const CHECKER_VERSION = 2;
 
 /** A previously recorded verdict for this configuration, if there is one. */
 export async function readSmokeResult(

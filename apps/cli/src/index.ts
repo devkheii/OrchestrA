@@ -18,7 +18,7 @@ import type { DaemonHandle, SessionEvent } from "@dem/protocol";
 import { runInteractive } from "./interactive.js";
 import { readLine, runOnce, showLog } from "./commands.js";
 import { runAuth } from "./auth.js";
-import { runSetup } from "./setup.js";
+import { runSetup, SETUP_DONE } from "./setup.js";
 
 export { createSession, renderSince, runTurn } from "./session-ui.js";
 export type { Approver, PendingCall } from "./session-ui.js";
@@ -171,7 +171,13 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
       // Nothing configured means setup, not a fake provider that echoes the
       // question back. Appearing to work spends a user's trust before the
       // tool has done anything with it.
-      if (!isConfigured(settings)) return runSetup(io, process.cwd());
+      if (!isConfigured(settings)) {
+        const code = await runSetup(io, process.cwd());
+        if (code !== SETUP_DONE) return code;
+        // Straight into the session the user came for. Re-read, because setup
+        // just wrote the config this run was started without.
+        settings = await settingsFor(rawArgv);
+      }
 
       return withDaemon(settings, io, (daemon) => {
         const selection = providerFromSettings(settings);
@@ -184,8 +190,11 @@ export async function main(rawArgv: readonly string[], io: Io = consoleIo): Prom
       io.out(HELP);
       return 0;
 
-    case "setup":
-      return runSetup(io, process.cwd());
+    case "setup": {
+      // Run on its own, setup configures and stops.
+      const code = await runSetup(io, process.cwd());
+      return code === SETUP_DONE ? 0 : code;
+    }
 
     case "auth":
       // No daemon and no provider: storing a credential must work before
@@ -378,8 +387,9 @@ async function withDaemon(
   // a council impossible to configure. A setup with no named providers reads
   // exactly as before, from the flat settings.
   let provider;
+  let chosen;
   try {
-    const chosen = await effectiveProvider(settings);
+    chosen = await effectiveProvider(settings);
     provider = providerFromChosen(chosen, settings.allowRemote).provider;
   } catch (err) {
     io.err(`dem: ${(err as Error).message}\n`);
@@ -391,7 +401,12 @@ async function withDaemon(
   // sync by hand, which made the case this harness is built around the most
   // awkward one to use.
   let modelServer: ModelServer | undefined;
-  if (settings.modelPath && settings.baseUrl) {
+  // Only when this run is actually going to that server. A built-in kind —
+  // `fake`, `anthropic`, `claude-cli` — overrides the endpoint in config, and
+  // loading weights for a provider the run will not use costs minutes and
+  // then fails a smoke test against a server nothing asked for.
+  const usesConfiguredEndpoint = !chosen.kind;
+  if (usesConfiguredEndpoint && settings.modelPath && settings.baseUrl) {
     try {
       modelServer = await ensureModelServer(settings.baseUrl, {
         modelPath: settings.modelPath,
@@ -422,11 +437,14 @@ async function withDaemon(
   // catch failure modes — a quantized cache, a GGUF with no chat template —
   // that only exist when we are the ones serving the weights.
   const servesLocally =
-    providerFromSettings(settings).local && Boolean(settings.modelPath ?? settings.baseUrl);
+    usesConfiguredEndpoint &&
+    providerFromSettings(settings).local &&
+    Boolean(settings.modelPath ?? settings.baseUrl);
 
   if (servesLocally && !settings.skipSmokeTest) {
     const smokeConfig = {
       model: settings.model,
+      baseUrl: settings.baseUrl,
       modelPath: settings.modelPath,
       args: settings.llamaArgs,
     };

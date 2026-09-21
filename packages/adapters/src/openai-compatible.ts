@@ -74,7 +74,7 @@ export class OpenAICompatibleProvider implements Provider {
 
   async health(): Promise<ProviderHealth> {
     try {
-      const res = await fetch(`${trimEnd(this.config.baseUrl)}/v1/models`, {
+      const res = await fetch(apiUrl(this.config.baseUrl, "models"), {
         headers: this.headers(),
         signal: AbortSignal.timeout(this.config.timeoutMs ?? 5000),
       });
@@ -91,7 +91,7 @@ export class OpenAICompatibleProvider implements Provider {
 
     let response: Response;
     try {
-      response = await fetch(`${trimEnd(this.config.baseUrl)}/v1/chat/completions`, {
+      response = await fetch(apiUrl(this.config.baseUrl, "chat/completions"), {
         method: "POST",
         headers: { "content-type": "application/json", ...this.headers() },
         body: JSON.stringify({
@@ -334,6 +334,20 @@ async function* sseFrames(
  * neither what was being reached nor what to do. For a local-first harness the
  * overwhelmingly common cause is a model server that is not running.
  */
+/**
+ * The API path, for both ways people write a baseUrl.
+ *
+ * Every provider's own documentation gives an endpoint that ends in `/v1`, so
+ * that is what a user configures and what `dem setup` writes. Appending `/v1`
+ * unconditionally asked a real Ollama for `/v1/v1/chat/completions` and got a
+ * 404 on everything — a setup wizard writing a configuration that could not
+ * work, which is the opposite of what it is for.
+ */
+function apiUrl(baseUrl: string, path: string): string {
+  const base = trimEnd(baseUrl);
+  return /\/v\d+$/.test(base) ? `${base}/${path}` : `${base}/v1/${path}`;
+}
+
 function unreachable(err: unknown, baseUrl: string): string {
   const message = (err as Error).message ?? String(err);
   const refused = /fetch failed|ECONNREFUSED|ENOTFOUND|EAI_AGAIN/i.test(message);

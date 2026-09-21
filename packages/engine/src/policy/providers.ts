@@ -65,7 +65,11 @@ export async function effectiveProvider(
   // `--provider anthropic` keeps working for someone who has configured
   // nothing, and so a configured entry cannot quietly take over a kind's name.
   if (asked && BUILT_IN.has(asked)) {
-    return withKey({ name: asked, kind: asked, ...topLevel(settings) }, home);
+    // A built-in kind brings its own transport, so a `baseUrl` left in config
+    // for the OpenAI-compatible path must not follow it. It did, and a
+    // `--provider fake` run went to a real endpoint.
+    const { baseUrl: _ignored, ...rest } = topLevel(settings);
+    return withKey({ name: asked, ...rest, kind: asked }, home);
   }
 
   if (asked) {

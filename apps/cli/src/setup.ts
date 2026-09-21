@@ -28,6 +28,14 @@ import type { Io } from "./session-ui.js";
  * Everyone who knows all that already has a harness.
  */
 
+/**
+ * Setup succeeded and the caller should carry on into a session.
+ *
+ * A distinct value rather than 0, because `dem setup` run on its own should
+ * exit and bare `dem` should continue; the difference belongs to the caller.
+ */
+export const SETUP_DONE = -1;
+
 interface Choice {
   label: string;
   detail: string;
@@ -86,11 +94,10 @@ export async function runSetup(io: Io, workspace: string = process.cwd()): Promi
 
     io.err(`\n[1mwrote ${join(workspace, ".dem", "config.json")}[0m\n`);
     io.err("[2mit is a plain file; edit it or re-run dem setup any time[0m\n\n");
-    io.err("Try it:\n");
-    io.err("  [1mdem models[0m          check the connection\n");
-    io.err("  [1mdem run \"...\"[0m       ask one question\n");
-    io.err("  [1mdem[0m                 start a session\n");
-    return 0;
+    // Setup ends where the user wanted to be, not with a list of commands to
+    // type next. Configuring a model and then being handed homework is the
+    // same dead end as not configuring one.
+    return SETUP_DONE;
   } finally {
     rl.close();
   }

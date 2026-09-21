@@ -15,3 +15,6 @@ docs/archive/
 # The upstream dataset is fetched, not authored: experiments/ceiling/data/tasks.jsonl
 # is the selection this experiment actually ran on and that one is committed.
 experiments/ceiling/data/HumanEvalPlus*
+
+# A local setup writes this; it names paths on one machine.
+.dem/

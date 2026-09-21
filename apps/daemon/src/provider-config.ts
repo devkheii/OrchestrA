@@ -106,6 +106,13 @@ export function resolveProvider(env: ProviderEnv): ProviderSelection {
     );
   }
 
+  // Asked for by name. Kept distinct from the no-endpoint fallback below so
+  // that a configured baseUrl cannot quietly send a `--provider fake` run to a
+  // real server, which is what happened while the two shared a branch.
+  if (env.DEM_PROVIDER === "fake") {
+    return { provider: new FakeProvider(), local: true, label: "fake (asked for)" };
+  }
+
   if (!env.DEM_BASE_URL) {
     return { provider: new FakeProvider(), local: true, label: "fake (no provider configured)" };
   }

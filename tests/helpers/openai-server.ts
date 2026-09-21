@@ -34,6 +34,17 @@ export async function startFakeOpenAI(options: FakeEndpointOptions = {}): Promis
   const server: Server = createServer(async (req, res) => {
     requests.push({ headers: req.headers, body: await readBody(req) });
 
+    // The path matters, or a test cannot tell a correct URL from a wrong one.
+    // It could not: the adapter asked for /v1/v1/chat/completions against a
+    // real Ollama and got a 404, while every test here passed, because this
+    // stand-in answered whatever it was asked for.
+    const path = (req.url ?? "").split("?")[0] ?? "";
+    if (!/^\/v1\/(chat\/completions|models)$/.test(path)) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: { message: `no such path: ${path}` } }));
+      return;
+    }
+
     if (options.errorStatus !== undefined) {
       res.writeHead(options.errorStatus, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: { message: "upstream refused" } }));
